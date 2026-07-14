@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stellar Codex — Sci-Fi D&amp;D</title>
+  <meta name="description" content="A D&amp;D-style sci-fi browser RPG: d20 combat, exploration, quests. Built under The Conductor multi-lane plan." />
+  <meta name="theme-color" content="#06080f" />
+  <link rel="stylesheet" href="css/game.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand"><i>◆</i> Stellar Codex</div>
+      <div class="topbar-actions">
+        <span class="chip" id="hud-credits-top">—</span>
+        <button type="button" class="btn btn-ghost" id="btn-save">Save</button>
+        <button type="button" class="btn btn-ghost" id="btn-load">Load</button>
+        <button type="button" class="btn btn-ghost" id="btn-title">Title</button>
+      </div>
+    </header>
+
+    <!-- TITLE -->
+    <section class="screen active" id="screen-title" data-conductor-lane="shell">
+      <div class="title-hero">
+        <div class="tag">D&amp;D rules · Sci-fi station crawl</div>
+        <h1>Stellar <span>Codex</span></h1>
+        <p class="lead">
+          The Shattered Corridor drifts dead in the void. Something still walks the Bridge.
+          Roll d20s, pick an archetype, and reclaim the jump cipher.
+        </p>
+        <div class="title-actions">
+          <button type="button" class="btn btn-primary" id="btn-new">New Run</button>
+          <button type="button" class="btn btn-ghost" id="btn-continue">Continue save</button>
+        </div>
+        <p class="lead" style="margin-top:1.25rem;font-size:0.9rem;color:var(--faint)">
+          1) New Run · 2) pick archetype + stats · 3) Launch · 4) explore map · 5) fight / talk
+        </p>
+      </div>
+      <p class="conductor-badge" id="conductor-meta">Loading game script…</p>
+      <noscript><p style="color:#ff5d7a;text-align:center">JavaScript is required to play.</p></noscript>
+    </section>
+
+    <!-- CREATE -->
+    <section class="screen" id="screen-create" data-conductor-lane="character">
+      <div class="grid-2">
+        <div class="panel">
+          <h2>Identity</h2>
+          <div class="field">
+            <label for="hero-name">Callsign</label>
+            <input id="hero-name" maxlength="24" placeholder="e.g. Kael Voss" autocomplete="off" />
+          </div>
+          <h2>Archetype</h2>
+          <div class="archetypes" id="arch-list"></div>
+        </div>
+        <div class="panel">
+          <h2>Attributes</h2>
+          <p class="points" id="points-left">Point-buy remaining: 12</p>
+          <div class="stats" id="stats-box"></div>
+          <p class="faint" style="margin-top:0.75rem">Range 8–15. Bonuses apply from archetype after you launch.</p>
+          <div id="arch-preview" style="margin-top:0.75rem"></div>
+          <div class="actions">
+            <button type="button" class="btn btn-ghost" id="btn-roll-stats">Roll stats</button>
+            <button type="button" class="btn btn-primary" id="btn-start">Launch into the Corridor</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PLAY -->
+    <section class="screen" id="screen-play" data-conductor-lane="play">
+      <div id="win-banner" class="panel" hidden style="border-color:rgba(93,255,168,0.35);background:rgba(93,255,168,0.08)">
+        <h2 style="color:var(--ok)">Jump vector locked</h2>
+        <p class="muted" style="margin:0">You cleared the Captain's Wraith and secured the Corridor. Save if you want the trophy run.</p>
+      </div>
+      <div class="play-layout">
+        <aside class="panel" data-conductor-lane="world">
+          <h2>Manifest</h2>
+          <div class="hud-bars">
+            <div>
+              <div class="bar-label"><span id="hud-name">—</span><span id="hud-ac">AC</span></div>
+              <div class="bar-label"><span id="hp-label">HP</span><span id="hud-weapon">—</span></div>
+              <div class="bar"><i id="hp-bar"></i></div>
+            </div>
+            <div>
+              <div class="bar-label"><span id="xp-label">XP</span><span id="hud-credits">0c</span></div>
+              <div class="bar xp"><i id="xp-bar"></i></div>
+            </div>
+          </div>
+          <h2>Quests</h2>
+          <ul class="quest-list" id="quests"></ul>
+          <h2 style="margin-top:0.85rem">Inventory</h2>
+          <ul class="inv-list" id="inv"></ul>
+        </aside>
+
+        <main class="panel" data-conductor-lane="combat-world">
+          <h2 id="loc-name">Location</h2>
+          <p id="loc-desc" class="muted"></p>
+          <div class="actions" id="loc-actions"></div>
+          <div id="combat" class="combat-box" hidden></div>
+          <div id="dialogue" class="dialogue" hidden></div>
+          <h2 style="margin-top:1rem">Ship log</h2>
+          <div class="log" id="log" aria-live="polite"></div>
+        </main>
+
+        <aside class="panel" data-conductor-lane="world">
+          <h2>Nav graph</h2>
+          <ul class="loc-list" id="exits"></ul>
+          <p class="faint" style="margin-top:0.85rem">
+            Tips: Rest only at Airlock. Market has Nyx. Bridge holds the endgame.
+          </p>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="js/game.js"></script>
+  <script>
+    // mirror credits into topbar when play renders
+    const obs = new MutationObserver(() => {
+      const c = document.getElementById("hud-credits");
+      const t = document.getElementById("hud-credits-top");
+      if (c && t && c.textContent) t.textContent = c.textContent;
+    });
+    obs.observe(document.getElementById("app"), { childList: true, subtree: true, characterData: true });
+  </script>
+</body>
+</html>

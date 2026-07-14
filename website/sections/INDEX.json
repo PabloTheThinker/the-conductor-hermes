@@ -1,0 +1,52 @@
+{
+  "sections": [
+    {
+      "slug": "01-nav",
+      "role": "surface",
+      "objective": "Nav island + brand mark + mobile drawer for official site",
+      "anchor": "#top"
+    },
+    {
+      "slug": "02-hero",
+      "role": "surface",
+      "objective": "Hero first viewport: kicker, headline, CTAs, ready-check panel",
+      "anchor": "#top"
+    },
+    {
+      "slug": "03-product",
+      "role": "product",
+      "objective": "Product story split: stock agents, Soul Resonance, thin/full, spine",
+      "anchor": "#product"
+    },
+    {
+      "slug": "04-pillars",
+      "role": "product",
+      "objective": "Pillars bento eight capabilities with visual tile",
+      "anchor": "#pillars"
+    },
+    {
+      "slug": "05-modes",
+      "role": "product",
+      "objective": "Thin vs full modes section for orchestration contracts",
+      "anchor": "#modes"
+    },
+    {
+      "slug": "06-combos",
+      "role": "product",
+      "objective": "Combos A-H horizontal rail with real combo names",
+      "anchor": "#combos"
+    },
+    {
+      "slug": "07-install",
+      "role": "docs",
+      "objective": "Hermes install terminal with copy command and READY path",
+      "anchor": "#install"
+    },
+    {
+      "slug": "08-close",
+      "role": "polish",
+      "objective": "Manifesto, final CTA, footer, a11y progress skip focus OG",
+      "anchor": "#close"
+    }
+  ]
+}

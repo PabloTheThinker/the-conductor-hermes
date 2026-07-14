@@ -1,0 +1,268 @@
+{
+  "session_id": "1d645a63-9bc8-4c26-8937-edccd346f3ed",
+  "goal": "Build a full-fledged D&D-style sci-fi browser game: character creation, d20 combat, exploration, inventory, quests, enemies, save/load, cinematic dark sci-fi UI. Playable end-to-end.",
+  "combo": "H",
+  "mode": "full",
+  "axes": [
+    "Game shell UI: title, HUD, panels, dark sci-fi visual system",
+    "Rules engine: d20 rolls, stats, skills, advantage, HP, levels",
+    "Combat system: turns, enemies, actions, loot, victory/defeat",
+    "World: map locations, exploration, NPCs, dialogue, quests",
+    "Character creation: races/archetypes sci-fi, point-buy, inventory start",
+    "Meta: save/load localStorage, settings, help, polish a11y"
+  ],
+  "packs": [
+    {
+      "role": "surface",
+      "objective": "Game shell UI: title, HUD, panels, dark sci-fi visual system",
+      "strategy": "",
+      "index": 0,
+      "total": 6,
+      "steps": [
+        "Scope: lock definition of done for \u00abGame shell UI: title, HUD, panels, dark sci-fi visual system\u00bb",
+        "Own only files for this axis (surface); do not edit sibling lanes",
+        "Ship interactive visual/UI slice with load-safe entry",
+        "Prove with manual open or paint/DOM smoke"
+      ],
+      "risks": [
+        "scope creep into sibling remnant territory",
+        "generic insights without executable steps",
+        "merge conflict with 5 parallel branch(es)"
+      ],
+      "acceptance": [
+        "Deliverable for \u00abGame shell UI: title, HUD, panels, dark sci-fi visual system\u00bb is runnable or test-backed on the real path",
+        "Sibling lanes untouched (role=surface)",
+        "Ready for parent merge after host report"
+      ],
+      "files_hint": [
+        "likely-touch: *game*",
+        "likely-touch: *shell*",
+        "likely-touch: *title*",
+        "likely-touch: *hud*"
+      ],
+      "key_decisions": [
+        "parallel branches: execute each work pack then merge once"
+      ],
+      "insights": [],
+      "progress_percent": 15.0,
+      "host_subagent_type": "general-purpose",
+      "host_capability_mode": "all",
+      "success_evidence": [
+        "report findings[] with concrete commands/paths/results",
+        "clone_handle set via spawn_ack",
+        "no sibling-lane file edits"
+      ],
+      "host_instruction": "Branch 1/6 (surface) \u2014 Game shell UI: title, HUD, panels, dark sci-fi visual system. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates."
+    },
+    {
+      "role": "rules",
+      "objective": "Rules engine: d20 rolls, stats, skills, advantage, HP, levels",
+      "strategy": "",
+      "index": 1,
+      "total": 6,
+      "steps": [
+        "Scope: lock definition of done for \u00abRules engine: d20 rolls, stats, skills, advantage, HP, levels\u00bb",
+        "Own only files for this axis (rules); do not edit sibling lanes",
+        "Implement pure logic module with exported formulas/state",
+        "Add unit tests that call shipped functions"
+      ],
+      "risks": [
+        "scope creep into sibling remnant territory",
+        "generic insights without executable steps",
+        "merge conflict with 5 parallel branch(es)"
+      ],
+      "acceptance": [
+        "Deliverable for \u00abRules engine: d20 rolls, stats, skills, advantage, HP, levels\u00bb is runnable or test-backed on the real path",
+        "Sibling lanes untouched (role=rules)",
+        "Ready for parent merge after host report"
+      ],
+      "files_hint": [
+        "likely-touch: *rules*",
+        "likely-touch: *engine*",
+        "likely-touch: *d20*",
+        "likely-touch: *rolls*"
+      ],
+      "key_decisions": [
+        "parallel branches: execute each work pack then merge once"
+      ],
+      "insights": [],
+      "progress_percent": 15.0,
+      "host_subagent_type": "general-purpose",
+      "host_capability_mode": "all",
+      "success_evidence": [
+        "report findings[] with concrete commands/paths/results",
+        "clone_handle set via spawn_ack",
+        "no sibling-lane file edits"
+      ],
+      "host_instruction": "Branch 2/6 (rules) \u2014 Rules engine: d20 rolls, stats, skills, advantage, HP, levels. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates."
+    },
+    {
+      "role": "implement",
+      "objective": "Combat system: turns, enemies, actions, loot, victory/defeat",
+      "strategy": "",
+      "index": 2,
+      "total": 6,
+      "steps": [
+        "Scope: lock definition of done for \u00abCombat system: turns, enemies, actions, loot, victory/defeat\u00bb",
+        "Own only files for this axis (implement); do not edit sibling lanes",
+        "Implement core path for \u00abCombat system: turns, enemies, actions, loot, victory/defeat\u00bb",
+        "Verify with a real run (test, CLI, or HTTP)"
+      ],
+      "risks": [
+        "scope creep into sibling remnant territory",
+        "generic insights without executable steps",
+        "merge conflict with 5 parallel branch(es)"
+      ],
+      "acceptance": [
+        "Deliverable for \u00abCombat system: turns, enemies, actions, loot, victory/defeat\u00bb is runnable or test-backed on the real path",
+        "Sibling lanes untouched (role=implement)",
+        "Ready for parent merge after host report"
+      ],
+      "files_hint": [
+        "likely-touch: *combat*",
+        "likely-touch: *system*",
+        "likely-touch: *turns*",
+        "likely-touch: *enemies*"
+      ],
+      "key_decisions": [
+        "parallel branches: execute each work pack then merge once"
+      ],
+      "insights": [],
+      "progress_percent": 15.0,
+      "host_subagent_type": "general-purpose",
+      "host_capability_mode": "all",
+      "success_evidence": [
+        "report findings[] with concrete commands/paths/results",
+        "clone_handle set via spawn_ack",
+        "no sibling-lane file edits"
+      ],
+      "host_instruction": "Branch 3/6 (implement) \u2014 Combat system: turns, enemies, actions, loot, victory/defeat. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates."
+    },
+    {
+      "role": "implement",
+      "objective": "World: map locations, exploration, NPCs, dialogue, quests",
+      "strategy": "",
+      "index": 3,
+      "total": 6,
+      "steps": [
+        "Scope: lock definition of done for \u00abWorld: map locations, exploration, NPCs, dialogue, quests\u00bb",
+        "Own only files for this axis (implement); do not edit sibling lanes",
+        "Implement core path for \u00abWorld: map locations, exploration, NPCs, dialogue, quests\u00bb",
+        "Verify with a real run (test, CLI, or HTTP)"
+      ],
+      "risks": [
+        "scope creep into sibling remnant territory",
+        "generic insights without executable steps",
+        "merge conflict with 5 parallel branch(es)"
+      ],
+      "acceptance": [
+        "Deliverable for \u00abWorld: map locations, exploration, NPCs, dialogue, quests\u00bb is runnable or test-backed on the real path",
+        "Sibling lanes untouched (role=implement)",
+        "Ready for parent merge after host report"
+      ],
+      "files_hint": [
+        "likely-touch: *world*",
+        "likely-touch: *map*",
+        "likely-touch: *locations*",
+        "likely-touch: *exploration*"
+      ],
+      "key_decisions": [
+        "parallel branches: execute each work pack then merge once"
+      ],
+      "insights": [],
+      "progress_percent": 15.0,
+      "host_subagent_type": "general-purpose",
+      "host_capability_mode": "all",
+      "success_evidence": [
+        "report findings[] with concrete commands/paths/results",
+        "clone_handle set via spawn_ack",
+        "no sibling-lane file edits"
+      ],
+      "host_instruction": "Branch 4/6 (implement) \u2014 World: map locations, exploration, NPCs, dialogue, quests. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates."
+    },
+    {
+      "role": "architect",
+      "objective": "Character creation: races/archetypes sci-fi, point-buy, inventory start",
+      "strategy": "",
+      "index": 4,
+      "total": 6,
+      "steps": [
+        "Scope: lock definition of done for \u00abCharacter creation: races/archetypes sci-fi, point-buy, inventory start\u00bb",
+        "Own only files for this axis (architect); do not edit sibling lanes",
+        "Design module boundaries and public contracts",
+        "Land one vertical slice implementing the contract"
+      ],
+      "risks": [
+        "scope creep into sibling remnant territory",
+        "generic insights without executable steps",
+        "merge conflict with 5 parallel branch(es)"
+      ],
+      "acceptance": [
+        "Deliverable for \u00abCharacter creation: races/archetypes sci-fi, point-buy, inventory star\u00bb is runnable or test-backed on the real path",
+        "Sibling lanes untouched (role=architect)",
+        "Ready for parent merge after host report"
+      ],
+      "files_hint": [
+        "likely-touch: *character*",
+        "likely-touch: *creation*",
+        "likely-touch: *races*",
+        "likely-touch: *archetypes*"
+      ],
+      "key_decisions": [
+        "parallel branches: execute each work pack then merge once"
+      ],
+      "insights": [],
+      "progress_percent": 15.0,
+      "host_subagent_type": "plan",
+      "host_capability_mode": "read-only",
+      "success_evidence": [
+        "report findings[] with concrete commands/paths/results",
+        "clone_handle set via spawn_ack",
+        "no sibling-lane file edits"
+      ],
+      "host_instruction": "Branch 5/6 (architect) \u2014 Character creation: races/archetypes sci-fi, point-buy, inventory start. Host spawn: plan/read-only. Do real work in this lane only; report evidence, not pack templates."
+    },
+    {
+      "role": "polish",
+      "objective": "Meta: save/load localStorage, settings, help, polish a11y",
+      "strategy": "",
+      "index": 5,
+      "total": 6,
+      "steps": [
+        "Scope: lock definition of done for \u00abMeta: save/load localStorage, settings, help, polish a11y\u00bb",
+        "Own only files for this axis (polish); do not edit sibling lanes",
+        "Responsive collapse, contrast, reduced-motion, asset paths",
+        "Serve locally and capture URL / HTTP 200 as evidence"
+      ],
+      "risks": [
+        "scope creep into sibling remnant territory",
+        "generic insights without executable steps",
+        "merge conflict with 5 parallel branch(es)"
+      ],
+      "acceptance": [
+        "Deliverable for \u00abMeta: save/load localStorage, settings, help, polish a11y\u00bb is runnable or test-backed on the real path",
+        "Sibling lanes untouched (role=polish)",
+        "Ready for parent merge after host report"
+      ],
+      "files_hint": [
+        "likely-touch: *meta*",
+        "likely-touch: *save*",
+        "likely-touch: *load*",
+        "likely-touch: *localstorage*"
+      ],
+      "key_decisions": [
+        "parallel branches: execute each work pack then merge once"
+      ],
+      "insights": [],
+      "progress_percent": 15.0,
+      "host_subagent_type": "general-purpose",
+      "host_capability_mode": "all",
+      "success_evidence": [
+        "report findings[] with concrete commands/paths/results",
+        "clone_handle set via spawn_ack",
+        "no sibling-lane file edits"
+      ],
+      "host_instruction": "Branch 6/6 (polish) \u2014 Meta: save/load localStorage, settings, help, polish a11y. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates."
+    }
+  ]
+}

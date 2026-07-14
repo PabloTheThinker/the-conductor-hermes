@@ -1,0 +1,86 @@
+{
+  "role": "product",
+  "objective": "Combos A-H horizontal rail with real combo names",
+  "strategy": "",
+  "index": 5,
+  "total": 8,
+  "steps": [
+    "Scope: lock definition of done for \u00abCombos A-H horizontal rail with real combo names\u00bb",
+    "Own only files for this axis (product); do not edit sibling lanes",
+    "Write product truth sections (pillars/capabilities) with real names not filler",
+    "Vary layout family from hero; no three equal cards"
+  ],
+  "risks": [
+    "scope creep into sibling remnant territory",
+    "generic insights without executable steps",
+    "merge conflict with 7 parallel branch(es)"
+  ],
+  "acceptance": [
+    "Deliverable for \u00abCombos A-H horizontal rail with real combo names\u00bb is runnable or test-backed on the real path",
+    "Sibling lanes untouched (role=product)",
+    "Ready for parent merge after host report"
+  ],
+  "files_hint": [
+    "likely-touch: *combos*",
+    "likely-touch: *a-h*",
+    "likely-touch: *horizontal*",
+    "likely-touch: *rail*"
+  ],
+  "key_decisions": [
+    "parallel branches: execute each work pack then merge once"
+  ],
+  "insights": [],
+  "progress_percent": 15.0,
+  "host_subagent_type": "general-purpose",
+  "host_capability_mode": "all",
+  "success_evidence": [
+    "report findings[] with concrete commands/paths/results",
+    "clone_handle set via spawn_ack",
+    "no sibling-lane file edits"
+  ],
+  "host_instruction": "Branch 6/8 (product) \u2014 Combos A-H horizontal rail with real combo names. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates.",
+  "combos_live": [
+    {
+      "id": "A",
+      "name": "Daily driver",
+      "summary": "SOUL + Orchestration + Memory + host tools \u2014 default fast path."
+    },
+    {
+      "id": "B",
+      "name": "Chessboard",
+      "summary": "Tracks + Memory map risks/opportunities before fan-out."
+    },
+    {
+      "id": "C",
+      "name": "Parallel push",
+      "summary": "Remnant Protocol fan-out on live branches; merge Fast\u2192Reflective\u2192Deep."
+    },
+    {
+      "id": "D",
+      "name": "Deep forge",
+      "summary": "Noesis/Crucible pocket for deep simulation and distillation."
+    },
+    {
+      "id": "E",
+      "name": "Max Effort decision",
+      "summary": "Ethics + four voices + mandatory 24\u201348h Voice of Action."
+    },
+    {
+      "id": "F",
+      "name": "Integrity cascade",
+      "summary": "Sense wound \u2192 field repair \u2192 scar/seal \u2192 advance (no thrash)."
+    },
+    {
+      "id": "G",
+      "name": "Evidence gate",
+      "summary": "Plan \u2192 work \u2192 review \u2192 verification artifacts; done = proven."
+    },
+    {
+      "id": "H",
+      "name": "Full conductor stack",
+      "summary": "All pillars ordered: ethics \u2192 tracks \u2192 memory \u2192 path pick \u2192 merge \u2192 audit."
+    }
+  ],
+  "section_slug": "06-combos",
+  "anchor": "#combos"
+}

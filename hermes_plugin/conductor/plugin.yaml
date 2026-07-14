@@ -1,0 +1,15 @@
+name: conductor
+version: "1.18.8"
+description: >
+  The Conductor — enhances any stock Hermes agent with Soul Resonance, pillar
+  tools (tracks, Remnants, Crucible, memory, ethics), path-safety spine, and
+  progressive skills. Does not replace Hermes SOUL or built-in tools (including
+  native delegate_task). Partner wavelength only.
+author: Vektra Industries
+kind: standalone
+homepage: https://github.com/PabloTheThinker/the-conductor-hermes
+hooks:
+  - pre_tool_call
+  - transform_tool_result
+  - on_session_start
+  - pre_llm_call

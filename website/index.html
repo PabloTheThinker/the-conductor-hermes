@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Conductor - Enhance the agent that uses it</title>
+  <meta name="description" content="The Conductor is a Hermes-ready skillset module: Soul Resonance, Remnants, tracks, Crucible, and a safety spine. Partner wavelength for the meister you already trust." />
+  <meta name="theme-color" content="#070807" />
+  <meta property="og:title" content="The Conductor" />
+  <meta property="og:description" content="Skillset module that enhances Hermes and any host agent. No fork. No SOUL hijack." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="assets/hero.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070807'/%3E%3Cpath d='M8 22 L16 8 L24 22' fill='none' stroke='%233d9a6a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='20' r='1.6' fill='%233d9a6a'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600,700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070807;
+      --bg-elev: #0c100e;
+      --bg-card: #101512;
+      --ink: #e8eee9;
+      --muted: #8a968c;
+      --faint: #5c675e;
+      --line: rgba(232, 238, 233, 0.08);
+      --line-strong: rgba(232, 238, 233, 0.14);
+      --accent: #3d9a6a;
+      --accent-hi: #4fb87e;
+      --accent-soft: rgba(61, 154, 106, 0.14);
+      --accent-glow: rgba(61, 154, 106, 0.32);
+      --radius: 1.25rem;
+      --radius-lg: 1.75rem;
+      --ease: cubic-bezier(0.32, 0.72, 0, 1);
+      --font-display: "Clash Display", "Satoshi", system-ui, sans-serif;
+      --font-body: "Satoshi", system-ui, sans-serif;
+      --max: 1180px;
+      --nav-h: 4.5rem;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    ::selection { background: rgba(61, 154, 106, 0.35); color: #fff; }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 80;
+      opacity: 0.032;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* Read progress */
+    .progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      width: 0%;
+      z-index: 90;
+      background: linear-gradient(90deg, var(--accent), var(--accent-hi));
+      box-shadow: 0 0 12px var(--accent-glow);
+      pointer-events: none;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    img { max-width: 100%; display: block; height: auto; }
+    button { font: inherit; border: 0; cursor: pointer; background: none; color: inherit; }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .skip {
+      position: absolute;
+      left: 1rem;
+      top: -4rem;
+      z-index: 100;
+      padding: 0.65rem 1rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #041008;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: top 0.25s var(--ease);
+    }
+    .skip:focus { top: 1rem; }
+
+    .wrap {
+      width: min(100% - 2rem, var(--max));
+      margin-inline: auto;
+    }
+
+    /* Nav */
+    .nav-shell {
+      position: fixed;
+      top: 1rem;
+      left: 0;
+      right: 0;
+      z-index: 60;
+      display: flex;
+      justify-content: center;
+      padding: 0 1rem;
+      pointer-events: none;
+    }
+    .nav {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.45rem 0.4rem 1rem;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      background: rgba(10, 14, 11, 0.72);
+      backdrop-filter: blur(20px) saturate(140%);
+      -webkit-backdrop-filter: blur(20px) saturate(140%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.06),
+        0 18px 50px rgba(0,0,0,0.35);
+      max-width: 100%;
+    }
+    .nav-brand {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.92rem;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      margin-right: 0.5rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .nav-mark {
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 0.4rem;
+      border: 1px solid var(--line-strong);
+      display: grid;
+      place-items: center;
+      background: rgba(61,154,106,0.08);
+    }
+    .nav-brand em { color: var(--accent); font-style: normal; }
+    .nav-links { display: none; align-items: center; gap: 0.1rem; }
+    @media (min-width: 900px) { .nav-links { display: flex; } }
+    .nav-links a {
+      font-size: 0.84rem;
+      color: var(--muted);
+      padding: 0.55rem 0.72rem;
+      border-radius: 999px;
+      transition: color 0.35s var(--ease), background 0.35s var(--ease);
+    }
+    .nav-links a:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+    .nav-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin-left: 0.25rem;
+      padding: 0.45rem 0.5rem 0.45rem 1rem;
+      border-radius: 999px;
+      background: var(--ink);
+      color: var(--bg);
+      font-size: 0.82rem;
+      font-weight: 600;
+      transition: transform 0.35s var(--ease), background 0.35s var(--ease);
+    }
+    .nav-cta:hover { background: #fff; }
+    .nav-cta:active { transform: scale(0.98); }
+    .nav-cta i {
+      width: 1.85rem;
+      height: 1.85rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(7,8,7,0.1);
+      transition: transform 0.4s var(--ease);
+    }
+    .nav-cta:hover i { transform: translate(1px, -1px) scale(1.05); }
+    .nav-toggle {
+      display: grid;
+      place-items: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 999px;
+      margin-left: 0.15rem;
+      border: 1px solid var(--line);
+    }
+    @media (min-width: 900px) { .nav-toggle { display: none; } }
+    .nav-toggle span,
+    .nav-toggle span::before,
+    .nav-toggle span::after {
+      display: block;
+      width: 1rem;
+      height: 1.5px;
+      background: var(--ink);
+      border-radius: 2px;
+      position: relative;
+      transition: transform 0.4s var(--ease), opacity 0.3s var(--ease);
+    }
+    .nav-toggle span::before,
+    .nav-toggle span::after {
+      content: "";
+      position: absolute;
+      left: 0;
+    }
+    .nav-toggle span::before { top: -5px; }
+    .nav-toggle span::after { top: 5px; }
+    .nav-toggle.is-open span { background: transparent; }
+    .nav-toggle.is-open span::before { top: 0; transform: rotate(45deg); }
+    .nav-toggle.is-open span::after { top: 0; transform: rotate(-45deg); }
+
+    .nav-drawer {
+      position: fixed;
+      inset: 0;
+      z-index: 55;
+      background: rgba(7,8,7,0.9);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s var(--ease);
+    }
+    .nav-drawer.is-open { opacity: 1; pointer-events: auto; }
+    .nav-drawer nav { display: grid; gap: 0.55rem; text-align: center; }
+    .nav-drawer a {
+      font-family: var(--font-display);
+      font-size: clamp(1.7rem, 6vw, 2.5rem);
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      opacity: 0;
+      transform: translateY(1.25rem);
+      transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+    }
+    .nav-drawer.is-open a { opacity: 1; transform: none; }
+    .nav-drawer a:nth-child(1) { transition-delay: 0.05s; }
+    .nav-drawer a:nth-child(2) { transition-delay: 0.1s; }
+    .nav-drawer a:nth-child(3) { transition-delay: 0.15s; }
+    .nav-drawer a:nth-child(4) { transition-delay: 0.2s; }
+    .nav-drawer a:nth-child(5) { transition-delay: 0.25s; }
+    .nav-drawer a:nth-child(6) { transition-delay: 0.3s; }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      min-height: 100dvh;
+      padding: 6.5rem 0 3.5rem;
+      display: grid;
+      align-items: end;
+      overflow: hidden;
+    }
+    .hero-bg { position: absolute; inset: 0; z-index: 0; }
+    .hero-bg img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.5;
+      transform: scale(1.02);
+    }
+    .hero-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(7,8,7,0.4) 0%, rgba(7,8,7,0.58) 42%, var(--bg) 100%),
+        radial-gradient(ellipse 55% 45% at 78% 22%, var(--accent-soft), transparent 62%);
+    }
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 2.25rem;
+    }
+    @media (min-width: 960px) {
+      .hero-grid {
+        grid-template-columns: 1.12fr 0.88fr;
+        align-items: end;
+        gap: 3rem;
+      }
+    }
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(61,154,106,0.28);
+      background: rgba(61,154,106,0.08);
+    }
+    .hero-kicker i {
+      width: 0.4rem;
+      height: 0.4rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: clamp(2.55rem, 6.6vw, 4.5rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+      margin: 0 0 1.15rem;
+      max-width: 12ch;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--accent-hi);
+      font-weight: 500;
+      padding-bottom: 0.08em;
+    }
+    .hero-lead {
+      margin: 0 0 1.6rem;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 34ch;
+      line-height: 1.65;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+      border-radius: 999px;
+      padding: 0.85rem 0.9rem 0.85rem 1.25rem;
+      font-weight: 600;
+      font-size: 0.92rem;
+      transition: transform 0.35s var(--ease), background 0.35s var(--ease), border-color 0.35s var(--ease);
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--accent); color: #041008; }
+    .btn-primary:hover { background: var(--accent-hi); }
+    .btn-primary i,
+    .btn-ghost i {
+      width: 1.9rem;
+      height: 1.9rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,0.12);
+      transition: transform 0.4s var(--ease);
+    }
+    .btn-primary:hover i,
+    .btn-ghost:hover i { transform: translate(1px, -1px); }
+    .btn-ghost {
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+      background: rgba(255,255,255,0.02);
+    }
+    .btn-ghost:hover { border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.04); }
+    .btn-ghost i { background: rgba(255,255,255,0.06); }
+
+    .hero-panel {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background: rgba(13,16,14,0.58);
+      padding: 0.35rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+    .hero-panel-inner {
+      border-radius: calc(var(--radius-lg) - 0.2rem);
+      border: 1px solid var(--line);
+      background: var(--bg-card);
+      padding: 1.3rem 1.35rem 1.15rem;
+      box-shadow: inset 0 1px 1px rgba(255,255,255,0.04);
+    }
+    .hero-panel-kicker {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.8rem;
+      font-weight: 600;
+    }
+    .hero-panel code {
+      display: block;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 0.76rem;
+      line-height: 1.7;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+    .hero-panel code b { color: var(--ink); font-weight: 500; }
+    .hero-panel code .ok { color: var(--accent-hi); }
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-top: 1.05rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+    }
+    .hero-meta strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 1.12rem;
+      letter-spacing: -0.02em;
+    }
+    .hero-meta span {
+      font-size: 0.72rem;
+      color: var(--faint);
+    }
+
+    section { padding: 5.25rem 0; }
+    @media (min-width: 768px) { section { padding: 6.75rem 0; } }
+
+    .section-head {
+      max-width: 40rem;
+      margin-bottom: 2.5rem;
+    }
+    .section-head h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.85rem, 3.8vw, 2.9rem);
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+      margin: 0 0 0.85rem;
+      font-weight: 600;
+    }
+    .section-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      max-width: 48ch;
+    }
+
+    /* Proof */
+    .proof {
+      padding: 1.35rem 0 0;
+      border-top: 1px solid var(--line);
+    }
+    .proof-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.5rem;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--faint);
+      font-size: 0.84rem;
+    }
+    .proof-marks { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .proof-marks span {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.4rem 0.8rem;
+      color: var(--muted);
+      background: rgba(255,255,255,0.02);
+    }
+
+    /* Bento */
+    .bento {
+      display: grid;
+      gap: 0.85rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 768px) {
+      .bento {
+        grid-template-columns: repeat(12, 1fr);
+        grid-auto-rows: minmax(148px, auto);
+      }
+      .b1 { grid-column: span 7; grid-row: span 2; }
+      .b2 { grid-column: span 5; }
+      .b3 { grid-column: span 5; }
+      .b4 { grid-column: span 4; }
+      .b5 { grid-column: span 4; }
+      .b6 { grid-column: span 4; }
+      .b7 { grid-column: span 6; }
+      .b8 { grid-column: span 6; }
+    }
+    .tile {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.015);
+      padding: 0.3rem;
+      min-height: 100%;
+      transition: border-color 0.4s var(--ease), transform 0.5s var(--ease);
+    }
+    .tile:hover { border-color: rgba(61,154,106,0.3); transform: translateY(-2px); }
+    @media (prefers-reduced-motion: reduce) {
+      .tile:hover { transform: none; }
+    }
+    .tile-inner {
+      height: 100%;
+      border-radius: calc(var(--radius-lg) - 0.15rem);
+      border: 1px solid var(--line);
+      background: linear-gradient(165deg, rgba(255,255,255,0.03), transparent 40%), var(--bg-elev);
+      padding: 1.35rem 1.3rem 1.25rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .tile.visual .tile-inner { padding: 0; overflow: hidden; position: relative; }
+    .tile.visual img {
+      width: 100%;
+      height: 100%;
+      min-height: 230px;
+      object-fit: cover;
+      opacity: 0.92;
+      transition: transform 0.8s var(--ease);
+    }
+    .tile.visual:hover img { transform: scale(1.03); }
+    .tile-tag {
+      font-size: 0.72rem;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .tile h3 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 1.32rem;
+      letter-spacing: -0.025em;
+      font-weight: 600;
+    }
+    .tile p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.93rem;
+      line-height: 1.6;
+    }
+    .tile.feature-dark .tile-inner {
+      background:
+        radial-gradient(circle at 90% 10%, var(--accent-soft), transparent 45%),
+        var(--bg-card);
+      justify-content: flex-end;
+      min-height: 280px;
+    }
+    @media (min-width: 768px) {
+      .tile.feature-dark .tile-inner { min-height: 100%; }
+    }
+
+    /* Split */
+    .split { display: grid; gap: 2rem; }
+    @media (min-width: 900px) {
+      .split {
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 3.25rem;
+        align-items: center;
+      }
+    }
+    .split-media {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      padding: 0.35rem;
+      background: rgba(255,255,255,0.02);
+    }
+    .split-media figure {
+      margin: 0;
+      border-radius: calc(var(--radius-lg) - 0.15rem);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      position: relative;
+    }
+    .split-media img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+    }
+    .split-copy h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.75rem, 3.4vw, 2.55rem);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin: 0 0 1rem;
+      font-weight: 600;
+    }
+    .split-copy p {
+      color: var(--muted);
+      margin: 0 0 1.25rem;
+      max-width: 42ch;
+    }
+    .checklist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.75rem;
+    }
+    .checklist li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.75rem;
+      align-items: start;
+      color: var(--ink);
+      font-size: 0.95rem;
+    }
+    .checklist li::before {
+      content: "";
+      width: 0.55rem;
+      height: 0.55rem;
+      margin-top: 0.45rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+    .checklist span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-top: 0.15rem;
+    }
+
+    /* Modes: thin vs full */
+    .modes {
+      display: grid;
+      gap: 0.85rem;
+    }
+    @media (min-width: 800px) {
+      .modes { grid-template-columns: 1fr 1fr; }
+    }
+    .mode-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      padding: 0.3rem;
+      background: rgba(255,255,255,0.015);
+    }
+    .mode-card-inner {
+      border-radius: calc(var(--radius-lg) - 0.15rem);
+      border: 1px solid var(--line);
+      padding: 1.5rem 1.4rem;
+      background: var(--bg-elev);
+      height: 100%;
+    }
+    .mode-card.featured .mode-card-inner {
+      background:
+        radial-gradient(circle at 100% 0%, var(--accent-soft), transparent 50%),
+        var(--bg-card);
+      border-color: rgba(61,154,106,0.22);
+    }
+    .mode-card h3 {
+      font-family: var(--font-display);
+      margin: 0 0 0.5rem;
+      font-size: 1.35rem;
+      letter-spacing: -0.02em;
+    }
+    .mode-card p { margin: 0 0 1rem; color: var(--muted); font-size: 0.94rem; }
+    .mode-card ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.45rem;
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+    .mode-card ul li {
+      padding-left: 0.9rem;
+      position: relative;
+      color: var(--muted);
+    }
+    .mode-card ul li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55rem;
+      width: 0.35rem;
+      height: 0.35rem;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    /* Combos strip */
+    .combo-rail {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(11.5rem, 14rem);
+      gap: 0.75rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .combo-rail::-webkit-scrollbar { height: 4px; }
+    .combo-rail::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+    }
+    .combo-chip {
+      scroll-snap-align: start;
+      border-radius: 1.1rem;
+      border: 1px solid var(--line);
+      background: var(--bg-elev);
+      padding: 1.1rem 1rem;
+      min-height: 8.5rem;
+    }
+    .combo-chip strong {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .combo-chip span {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+    .combo-chip b {
+      display: inline-block;
+      margin-bottom: 0.45rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Install */
+    .install {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line-strong);
+      background:
+        radial-gradient(ellipse 70% 80% at 0% 0%, var(--accent-soft), transparent 50%),
+        var(--bg-elev);
+      padding: 0.35rem;
+    }
+    .install-inner {
+      border-radius: calc(var(--radius-lg) - 0.15rem);
+      border: 1px solid var(--line);
+      padding: clamp(1.5rem, 4vw, 2.5rem);
+      display: grid;
+      gap: 1.75rem;
+    }
+    @media (min-width: 900px) {
+      .install-inner { grid-template-columns: 1fr 1.15fr; align-items: center; }
+    }
+    .install h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.65rem, 3vw, 2.35rem);
+      letter-spacing: -0.03em;
+      margin: 0 0 0.75rem;
+      font-weight: 600;
+    }
+    .install p { margin: 0 0 1.25rem; color: var(--muted); max-width: 36ch; }
+    .terminal {
+      border-radius: 1rem;
+      border: 1px solid var(--line);
+      background: #050706;
+      overflow: hidden;
+    }
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.7rem 0.9rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .terminal-dots { display: flex; gap: 0.35rem; }
+    .terminal-dots i {
+      width: 0.55rem;
+      height: 0.55rem;
+      border-radius: 999px;
+      background: #2a322c;
+    }
+    .terminal-dots i:nth-child(1) { background: #5a3a3a; }
+    .terminal-dots i:nth-child(2) { background: #5a5235; }
+    .terminal-dots i:nth-child(3) { background: #2f4a38; }
+    .copy-btn {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.3rem 0.7rem;
+      transition: color 0.3s var(--ease), border-color 0.3s var(--ease), background 0.3s var(--ease);
+    }
+    .copy-btn:hover { color: var(--ink); border-color: var(--line-strong); }
+    .copy-btn.is-copied {
+      color: var(--accent-hi);
+      border-color: rgba(61,154,106,0.35);
+      background: rgba(61,154,106,0.08);
+    }
+    .terminal pre {
+      margin: 0;
+      padding: 1.05rem 1.1rem 1.2rem;
+      font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.76rem;
+      line-height: 1.7;
+      color: var(--muted);
+      overflow-x: auto;
+    }
+    .terminal pre .ok { color: var(--accent-hi); }
+    .terminal pre .cmd { color: var(--ink); }
+
+    /* Manifesto */
+    .manifesto { max-width: 48rem; }
+    .manifesto blockquote {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: clamp(1.55rem, 3.4vw, 2.45rem);
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+      font-weight: 500;
+    }
+    .manifesto cite {
+      display: block;
+      margin-top: 1.2rem;
+      font-style: normal;
+      color: var(--faint);
+      font-size: 0.9rem;
+    }
+
+    /* CTA */
+    .cta { text-align: center; padding: 3.5rem 0 5rem; }
+    .cta-box {
+      border-radius: calc(var(--radius-lg) + 0.25rem);
+      border: 1px solid var(--line-strong);
+      background:
+        radial-gradient(circle at 50% 0%, var(--accent-glow), transparent 55%),
+        var(--bg-card);
+      padding: 0.35rem;
+    }
+    .cta-box-inner {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--line);
+      padding: clamp(2.4rem, 6vw, 4.25rem) 1.5rem;
+    }
+    .cta h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.95rem, 4.3vw, 3.1rem);
+      letter-spacing: -0.035em;
+      margin: 0 auto 1rem;
+      max-width: 14ch;
+      font-weight: 600;
+    }
+    .cta p {
+      margin: 0 auto 1.75rem;
+      color: var(--muted);
+      max-width: 38ch;
+    }
+    .cta .hero-actions { justify-content: center; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 2.5rem 0 3rem;
+    }
+    .footer-grid {
+      display: grid;
+      gap: 2rem;
+    }
+    @media (min-width: 800px) {
+      .footer-grid {
+        grid-template-columns: 1.5fr 1fr 1fr 1fr;
+        gap: 1.5rem;
+      }
+    }
+    .footer-brand {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+    .footer-brand em { color: var(--accent); font-style: normal; }
+    footer p { color: var(--faint); font-size: 0.88rem; margin: 0; max-width: 30ch; }
+    footer h4 {
+      margin: 0 0 0.75rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--faint);
+      font-weight: 600;
+    }
+    footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
+    footer li a {
+      color: var(--muted);
+      font-size: 0.92rem;
+      transition: color 0.3s var(--ease);
+    }
+    footer li a:hover { color: var(--ink); }
+    .footer-base {
+      margin-top: 2.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: space-between;
+      color: var(--faint);
+      font-size: 0.8rem;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(1.35rem);
+      transition: opacity 0.75s var(--ease), transform 0.75s var(--ease);
+    }
+    .reveal.is-in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; }
+    }
+
+    .heal-note {
+      margin: 1.25rem 0 0;
+      padding: 1rem 1.15rem;
+      border-radius: 1rem;
+      border: 1px dashed rgba(61,154,106,0.28);
+      background: rgba(61,154,106,0.06);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .heal-note strong {
+      display: block;
+      color: var(--accent-hi);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+      font-weight: 600;
+    }
+
+    .combo-chip.is-live {
+      border-color: rgba(61,154,106,0.4);
+      background:
+        radial-gradient(circle at 100% 0%, var(--accent-soft), transparent 55%),
+        var(--bg-card);
+    }
+
+    .lane-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.65rem;
+    }
+    @media (min-width: 700px) {
+      .lane-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    .lane {
+      border-radius: 1rem;
+      border: 1px solid var(--line);
+      background: var(--bg-elev);
+      padding: 1rem 0.95rem;
+      display: grid;
+      gap: 0.2rem;
+    }
+    .lane b {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .lane strong {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      letter-spacing: -0.02em;
+    }
+    .lane span {
+      font-size: 0.78rem;
+      color: var(--faint);
+      font-family: ui-monospace, Menlo, monospace;
+    }
+
+    /* Section debug outline when ?conductor=1 */
+    html.conductor-debug [data-conductor-section] {
+      outline: 1px dashed rgba(61, 154, 106, 0.45);
+      outline-offset: -1px;
+    }
+    html.conductor-debug [data-conductor-section]::before {
+      content: attr(data-conductor-section) " · " attr(data-conductor-role);
+      display: block;
+      position: sticky;
+      top: 4.5rem;
+      z-index: 40;
+      width: max-content;
+      margin: 0.5rem 0 0 0.5rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(61,154,106,0.9);
+      color: #041008;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <div class="nav-shell" data-conductor-section="01-nav" data-conductor-role="surface">
+    <div class="nav" role="navigation" aria-label="Primary">
+      <a class="nav-brand" href="#top">
+        <span class="nav-mark" aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 9.5 L6 2.5 L9.5 9.5" stroke="#3d9a6a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="8.2" r="0.9" fill="#3d9a6a"/></svg>
+        </span>
+        The Conductor<em>.</em>
+      </a>
+      <div class="nav-links">
+        <a href="#product">Product</a>
+        <a href="#pillars">Pillars</a>
+        <a href="#modes">Modes</a>
+        <a href="#install">Install</a>
+      </div>
+      <a class="nav-cta" href="https://github.com/PabloTheThinker/the-conductor-hermes" target="_blank" rel="noopener">
+        GitHub
+        <i aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 9L9 3M9 3H4.5M9 3V7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </i>
+      </a>
+      <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false">
+        <span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="nav-drawer" id="drawer" aria-hidden="true">
+    <nav>
+      <a href="#product">Product</a>
+      <a href="#pillars">Pillars</a>
+      <a href="#modes">Modes</a>
+      <a href="#install">Install</a>
+      <a href="#combos">Combos</a>
+      <a href="https://github.com/PabloTheThinker/the-conductor-hermes">GitHub</a>
+    </nav>
+  </div>
+
+  <header class="hero" id="top" data-conductor-section="02-hero" data-conductor-role="surface">
+    <div class="hero-bg" aria-hidden="true">
+      <img src="assets/hero.jpg" alt="" width="1600" height="900" fetchpriority="high" />
+    </div>
+    <div class="wrap hero-grid">
+      <div class="reveal">
+        <div class="hero-kicker"><i></i> Hermes-ready module · 8 section lanes</div>
+        <h1>Enhance the meister.<br /><em>Never replace it.</em></h1>
+        <p class="hero-lead">
+          Skillset for stock Hermes and any host: Soul Resonance, Remnants,
+          tracks, Crucible, and a spine that stops thrash without stopping the mission.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#install">
+            Install for Hermes
+            <i aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </i>
+          </a>
+          <a class="btn btn-ghost" href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/docs/HERMES.md" target="_blank" rel="noopener">
+            Read the docs
+            <i aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 9L9 3M9 3H4.5M9 3V7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </i>
+          </a>
+        </div>
+      </div>
+      <div class="hero-panel reveal" style="transition-delay: 0.1s">
+        <div class="hero-panel-inner">
+          <div class="hero-panel-kicker">Ready check</div>
+          <code><b>$ conductor hermes-ready --repair</b>
+<span class="ok">✓</span> plugin + skills + config
+<span class="ok">✓</span> partner SOUL (meister untouched)
+<span class="ok">✓</span> status: READY
+
+source $HERMES_HOME/conductor.env
+hermes</code>
+          <div class="hero-meta">
+            <div><strong>1.18+</strong><span>Hermes-ready</span></div>
+            <div><strong>8</strong><span>Pillars</span></div>
+            <div><strong>0</strong><span>Forks required</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="wrap proof reveal">
+      <div class="proof-row">
+        <span>For operators who already trust their agent.</span>
+        <div class="proof-marks">
+          <span>Hermes native</span>
+          <span>MCP optional</span>
+          <span>MIT</span>
+          <span>No second TUI</span>
+        </div>
+      </div>
+    </div>
+
+    <section id="product" data-conductor-section="03-product" data-conductor-role="product">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>A partner wavelength, not another product face.</h2>
+          <p>
+            Hosts keep chat, auth, and identity. Conductor ships tools, skills,
+            orchestration contracts, and spine hooks that make the meister stronger.
+          </p>
+        </div>
+        <div class="split">
+          <div class="split-media reveal">
+            <figure>
+              <img src="assets/workspace.jpg" alt="Dark editorial workspace still life" width="1200" height="900" loading="lazy" />
+            </figure>
+          </div>
+          <div class="split-copy reveal">
+            <h2>Built for stock agents.</h2>
+            <p>
+              No forks. No SOUL hijack. Hermes owns <code>delegate_task</code>,
+              terminals, and files. Conductor only registers what enhances the host.
+            </p>
+            <ul class="checklist">
+              <li>
+                Soul Resonance
+                <span>Meister primary. Partner amplifies tracks, Remnants, and judgment.</span>
+              </li>
+              <li>
+                Thin vs full orchestration
+                <span>Single-path stays lean. Multi-axis work gets host clone contracts.</span>
+              </li>
+              <li>
+                Spine without thrash panic
+                <span>Path floors and repeat guards stop a failure class, not the mission.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pillars" data-conductor-section="04-pillars" data-conductor-role="product">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Eight pillars. One organism.</h2>
+          <p>
+            Each pillar upgrades the host. Combos A-H choose stacks for daily work,
+            parallel push, deep forge, or evidence gates. Healing stays as undercurrent.
+          </p>
+        </div>
+        <div class="bento">
+          <article class="tile b1 feature-dark reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P1 · Soul</div>
+              <h3>Resonance, not body-swap</h3>
+              <p>
+                Host SOUL names the self. Conductor locks wavelength: shared spine for ethics,
+                path safety, and done equals proven.
+              </p>
+            </div>
+          </article>
+          <article class="tile b2 visual reveal">
+            <div class="tile-inner">
+              <img src="assets/network.jpg" alt="Abstract network of emerald links on black" width="900" height="900" loading="lazy" />
+            </div>
+          </article>
+          <article class="tile b3 reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P3 · Tracks</div>
+              <h3>Chessboard, not todos</h3>
+              <p>Living multiverse graph of paths, risks, forks, and compounds.</p>
+            </div>
+          </article>
+          <article class="tile b4 reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P5 · Remnants</div>
+              <h3>Shadow clones</h3>
+              <p>Host-native parallel missions with report and curated merge.</p>
+            </div>
+          </article>
+          <article class="tile b5 reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P4 · Crucible</div>
+              <h3>Deep forge</h3>
+              <p>Surgical simulation pockets. RBMC when stakes justify depth.</p>
+            </div>
+          </article>
+          <article class="tile b6 reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P2 · Memory</div>
+              <h3>Four layers</h3>
+              <p>Episodic valence, seals, procedures, and track-linked recall.</p>
+            </div>
+          </article>
+          <article class="tile b7 reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P7 · Governance</div>
+              <h3>Safe power</h3>
+              <p>Policy tiers, audit trail, Max Effort four-voice deliberation.</p>
+            </div>
+          </article>
+          <article class="tile b8 reveal">
+            <div class="tile-inner">
+              <div class="tile-tag">P8 · Ethics</div>
+              <h3>High-stakes gate</h3>
+              <p>Seven-point checklist before irreversible or emotional memory moves.</p>
+            </div>
+          </article>
+        </div>
+        <p class="heal-note reveal">
+          <strong>P0 undercurrent · Healing</strong>
+          Scars, seals, thrash guard, and path floors stay on even when no pillar is in the headline.
+        </p>
+      </div>
+    </section>
+
+    <section id="modes" data-conductor-section="05-modes" data-conductor-role="product">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Thin by default. Full when the board splits.</h2>
+          <p>
+            Live drives taught us ritual fanout rarely accelerates a single path.
+            Multi-axis goals get host clone contracts you must actually spawn.
+          </p>
+        </div>
+        <div class="modes">
+          <article class="mode-card reveal">
+            <div class="mode-card-inner">
+              <h3>Thin</h3>
+              <p>Ops, Q&amp;A, one-lane fixes, assessments.</p>
+              <ul>
+                <li>start_pack then host tools</li>
+                <li>Optional memory write</li>
+                <li>No remnant theater</li>
+              </ul>
+            </div>
+          </article>
+          <article class="mode-card featured reveal">
+            <div class="mode-card-inner">
+              <h3>Full</h3>
+              <p>Website, chess+AI, multi-surface product work.</p>
+              <ul>
+                <li>Domain axes (hero, product, docs, polish…)</li>
+                <li>Parent SPAWNs hermes_batch / spawn_subagent</li>
+                <li>report real findings, then curated merge</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="combos" data-conductor-section="06-combos" data-conductor-role="product">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <h2>Combos A-H</h2>
+          <p>Live catalog from <code>conductor.combos</code>. This site’s own build used <strong>Combo C</strong> with eight section lanes.</p>
+        </div>
+        <div class="combo-rail reveal" role="list">
+          <div class="combo-chip" role="listitem"><b>A</b><strong>Daily driver</strong><span>Fast host loop under spine. Default for single-path work.</span></div>
+          <div class="combo-chip" role="listitem"><b>B</b><strong>Chessboard</strong><span>Tracks map risks and forks before you commit.</span></div>
+          <div class="combo-chip is-live" role="listitem"><b>C</b><strong>Parallel push</strong><span>Used here: fanout every website section as a remnant work pack.</span></div>
+          <div class="combo-chip" role="listitem"><b>D</b><strong>Deep forge</strong><span>Crucible and RBMC for architecture stress.</span></div>
+          <div class="combo-chip" role="listitem"><b>E</b><strong>Max Effort</strong><span>Four voices before irreversible moves.</span></div>
+          <div class="combo-chip" role="listitem"><b>F</b><strong>Integrity cascade</strong><span>Heal cascade when the field is wounded.</span></div>
+          <div class="combo-chip" role="listitem"><b>G</b><strong>Evidence gate</strong><span>Done only with proof (serve URL, HTTP 200).</span></div>
+          <div class="combo-chip" role="listitem"><b>H</b><strong>Full conductor stack</strong><span>All pillars when the mission is systemic.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="install" data-conductor-section="07-install" data-conductor-role="docs">
+      <div class="wrap">
+        <div class="install reveal">
+          <div class="install-inner">
+            <div>
+              <h2>From zero to READY.</h2>
+              <p>
+                One repair command seeds plugin, skills, partner SOUL, and shell env.
+                Hermes meister SOUL stays untouched. Section packs live under <code>website/sections/</code>.
+              </p>
+              <div class="hero-actions">
+                <a class="btn btn-primary" href="https://github.com/PabloTheThinker/the-conductor-hermes" target="_blank" rel="noopener">
+                  Clone the repo
+                  <i aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 9L9 3M9 3H4.5M9 3V7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </i>
+                </a>
+                <a class="btn btn-ghost" href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/docs/HERMES.md" target="_blank" rel="noopener">
+                  Hermes guide
+                  <i aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </i>
+                </a>
+              </div>
+            </div>
+            <div class="terminal" aria-label="Install commands">
+              <div class="terminal-bar">
+                <div class="terminal-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+                <button type="button" class="copy-btn" id="copy-install" data-copy>Copy</button>
+              </div>
+              <pre id="install-snippet"><span class="cmd">git clone https://github.com/PabloTheThinker/the-conductor-hermes.git</span>
+cd the-conductor-hermes
+./scripts/install_for_hermes.sh
+
+<span class="cmd">export HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"</span>
+<span class="cmd">source "$HERMES_HOME/conductor.env"</span>
+<span class="cmd">conductor hermes-ready</span>
+<span class="ok"># status: READY</span>
+<span class="cmd">hermes</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="close" data-conductor-section="08-close" data-conductor-role="polish">
+      <div class="wrap">
+        <div class="manifesto reveal">
+          <blockquote>
+            We are not building a better soloist than Hermes.
+            We are building the layer that commands the orchestra.
+          </blockquote>
+          <cite>The Conductor product line - enhance the agent that uses it</cite>
+        </div>
+      </div>
+
+      <div class="wrap" style="margin-top: 3.5rem">
+        <div class="section-head reveal">
+          <h2>This page was planned as eight Conductor lanes.</h2>
+          <p>Each region is a remnant work pack under <code>website/sections/*.json</code>. Meister implements; Conductor owns the board.</p>
+        </div>
+        <div class="lane-grid reveal" role="list">
+          <article class="lane" role="listitem"><b>01</b><strong>Nav</strong><span>surface</span></article>
+          <article class="lane" role="listitem"><b>02</b><strong>Hero</strong><span>surface</span></article>
+          <article class="lane" role="listitem"><b>03</b><strong>Product</strong><span>product</span></article>
+          <article class="lane" role="listitem"><b>04</b><strong>Pillars</strong><span>product</span></article>
+          <article class="lane" role="listitem"><b>05</b><strong>Modes</strong><span>product</span></article>
+          <article class="lane" role="listitem"><b>06</b><strong>Combos</strong><span>product</span></article>
+          <article class="lane" role="listitem"><b>07</b><strong>Install</strong><span>docs</span></article>
+          <article class="lane" role="listitem"><b>08</b><strong>Close</strong><span>polish</span></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="wrap">
+        <div class="cta-box reveal">
+          <div class="cta-box-inner">
+            <h2>Put your agent in charge of the swarm.</h2>
+            <p>
+              Install the module, keep your meister, and run parallel work with
+              contracts that refuse theater.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://github.com/PabloTheThinker/the-conductor-hermes" target="_blank" rel="noopener">
+                Open on GitHub
+                <i aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 9L9 3M9 3H4.5M9 3V7.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </i>
+              </a>
+              <a class="btn btn-ghost" href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/docs/LESSONS.md" target="_blank" rel="noopener">
+                Lessons learned
+                <i aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer data-conductor-section="08-close" data-conductor-role="polish">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">The Conductor<em>.</em></div>
+          <p>Skillset module + MCP for AI harnesses. Partner wavelength for the meister you already run.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#pillars">Pillars</a></li>
+            <li><a href="#modes">Modes</a></li>
+            <li><a href="#combos">Combos</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Install</h4>
+          <ul>
+            <li><a href="#install">Ready check</a></li>
+            <li><a href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/docs/HERMES.md" target="_blank" rel="noopener">Hermes docs</a></li>
+            <li><a href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/scripts/install_for_hermes.sh" target="_blank" rel="noopener">Install script</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Resources</h4>
+          <ul>
+            <li><a href="https://github.com/PabloTheThinker/the-conductor-hermes" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a></li>
+            <li><a href="https://github.com/PabloTheThinker/the-conductor-hermes/blob/main/docs/LESSONS.md" target="_blank" rel="noopener">Lessons</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-base">
+        <span>Vektra Industries</span>
+        <span>MIT License</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const progress = document.getElementById("progress");
+      const onScroll = () => {
+        if (!progress) return;
+        const h = document.documentElement;
+        const max = h.scrollHeight - h.clientHeight;
+        const p = max > 0 ? (h.scrollTop / max) * 100 : 0;
+        progress.style.width = p + "%";
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+
+      const toggle = document.querySelector(".nav-toggle");
+      const drawer = document.getElementById("drawer");
+      if (toggle && drawer) {
+        const setOpen = (open) => {
+          toggle.classList.toggle("is-open", open);
+          drawer.classList.toggle("is-open", open);
+          toggle.setAttribute("aria-expanded", open ? "true" : "false");
+          drawer.setAttribute("aria-hidden", open ? "false" : "true");
+          document.body.style.overflow = open ? "hidden" : "";
+        };
+        toggle.addEventListener("click", () => setOpen(!drawer.classList.contains("is-open")));
+        drawer.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setOpen(false)));
+      }
+
+      const copyBtn = document.getElementById("copy-install");
+      const snippet = document.getElementById("install-snippet");
+      if (copyBtn && snippet) {
+        copyBtn.addEventListener("click", async () => {
+          const text = snippet.innerText.replace(/\s+$/g, "");
+          try {
+            await navigator.clipboard.writeText(text);
+            copyBtn.textContent = "Copied";
+            copyBtn.classList.add("is-copied");
+            setTimeout(() => {
+              copyBtn.textContent = "Copy";
+              copyBtn.classList.remove("is-copied");
+            }, 1600);
+          } catch (_) {
+            copyBtn.textContent = "Select + copy";
+          }
+        });
+      }
+
+      if (new URLSearchParams(location.search).get("conductor") === "1") {
+        document.documentElement.classList.add("conductor-debug");
+      }
+
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!reduce && "IntersectionObserver" in window) {
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((e) => {
+              if (e.isIntersecting) {
+                e.target.classList.add("is-in");
+                io.unobserve(e.target);
+              }
+            });
+          },
+          { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
+        );
+        document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+      } else {
+        document.querySelectorAll(".reveal").forEach((el) => el.classList.add("is-in"));
+      }
+    })();
+  </script>
+</body>
+</html>

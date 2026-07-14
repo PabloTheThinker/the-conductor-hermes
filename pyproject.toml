@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "the-conductor"
+version = "1.18.8"
+description = "The Conductor — skillset module + MCP server for AI agent harnesses (Hermes-ready)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pyyaml>=6.0",
+    "httpx>=0.27",
+    "pydantic>=2.0",
+    "prompt-toolkit>=3.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "websockets>=12.0",
+]
+
+[project.optional-dependencies]
+crucible = ["docker>=7.0"]
+mcp = ["mcp>=1.2", "anyio>=4.0"]
+dev = ["pytest>=8.0", "mypy>=1.0", "ruff>=0.4", "httpx>=0.27", "mcp>=1.2", "anyio>=4.0"]
+
+[project.scripts]
+conductor = "conductor.cli.main:main"
+the-conductor-mcp = "conductor.mcp.__main__:main"
+conductor-mcp = "conductor.mcp.__main__:main"
+
+# Stock Hermes discovers pip plugins via this entry-point group.
+[project.entry-points."hermes_agent.plugins"]
+conductor = "conductor.adapters.hermes.plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/conductor"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/conductor" = "conductor"
+
+[tool.hatch.build.targets.wheel.force-include]
+"SOUL.md" = "src/conductor/_bundle/SOUL.md"
+"skills/conductor" = "src/conductor/_bundle/skills/conductor"
+"hermes_plugin/conductor" = "src/conductor/_bundle/hermes_plugin/conductor"
+"conductor" = "src/conductor/_bundle/conductor"
+"crucible" = "src/conductor/_bundle/crucible"
+"governance" = "src/conductor/_bundle/governance"
+"memory" = "src/conductor/_bundle/memory"
+"noesis" = "src/conductor/_bundle/noesis"
+"tracks" = "src/conductor/_bundle/tracks"
+"ethics" = "src/conductor/_bundle/ethics"
+"docs" = "src/conductor/_bundle/docs"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = ["docker", "docker.*"]
+ignore_missing_imports = true

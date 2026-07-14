@@ -1,0 +1,44 @@
+{
+  "role": "product",
+  "objective": "Pillars bento eight capabilities with visual tile",
+  "strategy": "",
+  "index": 3,
+  "total": 8,
+  "steps": [
+    "Scope: lock definition of done for \u00abPillars bento eight capabilities with visual tile\u00bb",
+    "Own only files for this axis (product); do not edit sibling lanes",
+    "Write product truth sections (pillars/capabilities) with real names not filler",
+    "Vary layout family from hero; no three equal cards"
+  ],
+  "risks": [
+    "scope creep into sibling remnant territory",
+    "generic insights without executable steps",
+    "merge conflict with 7 parallel branch(es)"
+  ],
+  "acceptance": [
+    "Deliverable for \u00abPillars bento eight capabilities with visual tile\u00bb is runnable or test-backed on the real path",
+    "Sibling lanes untouched (role=product)",
+    "Ready for parent merge after host report"
+  ],
+  "files_hint": [
+    "likely-touch: *pillars*",
+    "likely-touch: *bento*",
+    "likely-touch: *eight*",
+    "likely-touch: *capabilities*"
+  ],
+  "key_decisions": [
+    "parallel branches: execute each work pack then merge once"
+  ],
+  "insights": [],
+  "progress_percent": 15.0,
+  "host_subagent_type": "general-purpose",
+  "host_capability_mode": "all",
+  "success_evidence": [
+    "report findings[] with concrete commands/paths/results",
+    "clone_handle set via spawn_ack",
+    "no sibling-lane file edits"
+  ],
+  "host_instruction": "Branch 4/8 (product) \u2014 Pillars bento eight capabilities with visual tile. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates.",
+  "section_slug": "04-pillars",
+  "anchor": "#pillars"
+}

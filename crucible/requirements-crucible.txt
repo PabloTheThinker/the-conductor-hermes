@@ -1,0 +1,12 @@
+# Minimal dependencies inside The Crucible container
+# Keep this extremely small for fast spin-up and low attack surface
+
+pydantic>=2.0
+python-dotenv>=1.0
+# Add your chosen LLM client here when ready, e.g.:
+# openai>=1.0
+# or anthropic, litellm, etc.
+
+# For internal clone communication (future)
+# redis>=5.0
+# or use in-memory multiprocessing.Queue for single-container mode

@@ -1,0 +1,49 @@
+# The Conductor + Hermes shared home (HERMES_HOME = CONDUCTOR_HOME)
+# Applied/updated by: conductor setup / conductor hermes-ready --repair
+#
+# Daily driver: hermes
+# Product plugin: conductor
+#
+# Dual-load rule: use the in-process plugin OR the MCP stdio server for external
+# meisters — not both in the same Hermes process. Do not put the-conductor in
+# Hermes mcp_servers when plugins.enabled includes conductor.
+#
+# Lesson: do not pin model.default here for existing Hermes users —
+# `hermes model` owns provider selection. setup only setdefaults if missing.
+
+plugins:
+  enabled:
+    - conductor
+
+# Hermes schema: known_plugin_toolsets is dict[platform → list], NOT a flat list.
+# Unknown plugin toolsets default ON; known-but-absent on a platform = disabled.
+# `conductor setup` writes the per-platform dict and merges the trio into every
+# existing platform_toolsets list (heals email/ntfy gaps).
+# known_plugin_toolsets:
+#   cli:
+#     - conductor
+#     - conductor_agent
+#     - research
+#   telegram:
+#     - conductor
+#     - conductor_agent
+#     - research
+
+# Optional: only set platform_toolsets if you already pin toolsets per platform.
+# When present, `conductor setup` merges conductor / conductor_agent / research
+# into every list. Do not replace stock Hermes lists with only Conductor names.
+# platform_toolsets:
+#   cli:
+#     - hermes-cli   # example stock name — keep your real host list
+#     - conductor
+#     - conductor_agent
+#     - research
+#   email:
+#     - hermes-email
+#     - conductor
+#     - conductor_agent
+#     - research
+
+surface:
+  default: production
+  product: The Conductor

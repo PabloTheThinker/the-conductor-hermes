@@ -1,0 +1,35 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.ilo-home-test/
+*.log
+.DS_Store
+
+# Local secrets / runtime state (never ship)
+.env
+.env.*
+!.env.example
+*.env
+!config.example.yaml
+conductor.env
+*.pem
+*.key
+*.sqlite
+*.sqlite3
+*.db
+!tests/**/*.sqlite
+
+# Operator homes / caches accidentally nested in checkout
+.hermes/
+.conductor/
+.cache/
+*.local.yaml
+*.local.yml

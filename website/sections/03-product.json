@@ -1,0 +1,44 @@
+{
+  "role": "product",
+  "objective": "Product story split: stock agents, Soul Resonance, thin/full, spine",
+  "strategy": "",
+  "index": 2,
+  "total": 8,
+  "steps": [
+    "Scope: lock definition of done for \u00abProduct story split: stock agents, Soul Resonance, thin/full, spine\u00bb",
+    "Own only files for this axis (product); do not edit sibling lanes",
+    "Write product truth sections (pillars/capabilities) with real names not filler",
+    "Vary layout family from hero; no three equal cards"
+  ],
+  "risks": [
+    "scope creep into sibling remnant territory",
+    "generic insights without executable steps",
+    "merge conflict with 7 parallel branch(es)"
+  ],
+  "acceptance": [
+    "Deliverable for \u00abProduct story split: stock agents, Soul Resonance, thin/full, spine\u00bb is runnable or test-backed on the real path",
+    "Sibling lanes untouched (role=product)",
+    "Ready for parent merge after host report"
+  ],
+  "files_hint": [
+    "likely-touch: *product*",
+    "likely-touch: *story*",
+    "likely-touch: *split*",
+    "likely-touch: *stock*"
+  ],
+  "key_decisions": [
+    "parallel branches: execute each work pack then merge once"
+  ],
+  "insights": [],
+  "progress_percent": 15.0,
+  "host_subagent_type": "general-purpose",
+  "host_capability_mode": "all",
+  "success_evidence": [
+    "report findings[] with concrete commands/paths/results",
+    "clone_handle set via spawn_ack",
+    "no sibling-lane file edits"
+  ],
+  "host_instruction": "Branch 3/8 (product) \u2014 Product story split: stock agents, Soul Resonance, thin/full, spine. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates.",
+  "section_slug": "03-product",
+  "anchor": "#product"
+}

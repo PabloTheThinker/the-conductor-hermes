@@ -1,0 +1,44 @@
+{
+  "role": "docs",
+  "objective": "Hermes install terminal with copy command and READY path",
+  "strategy": "",
+  "index": 6,
+  "total": 8,
+  "steps": [
+    "Scope: lock definition of done for \u00abHermes install terminal with copy command and READY path\u00bb",
+    "Own only files for this axis (docs); do not edit sibling lanes",
+    "Land install path + docs links that match real repo commands",
+    "Primary CTA + one secondary with distinct intent only"
+  ],
+  "risks": [
+    "scope creep into sibling remnant territory",
+    "generic insights without executable steps",
+    "merge conflict with 7 parallel branch(es)"
+  ],
+  "acceptance": [
+    "Deliverable for \u00abHermes install terminal with copy command and READY path\u00bb is runnable or test-backed on the real path",
+    "Sibling lanes untouched (role=docs)",
+    "Ready for parent merge after host report"
+  ],
+  "files_hint": [
+    "likely-touch: *hermes*",
+    "likely-touch: *install*",
+    "likely-touch: *terminal*",
+    "likely-touch: *copy*"
+  ],
+  "key_decisions": [
+    "parallel branches: execute each work pack then merge once"
+  ],
+  "insights": [],
+  "progress_percent": 15.0,
+  "host_subagent_type": "general-purpose",
+  "host_capability_mode": "all",
+  "success_evidence": [
+    "report findings[] with concrete commands/paths/results",
+    "clone_handle set via spawn_ack",
+    "no sibling-lane file edits"
+  ],
+  "host_instruction": "Branch 7/8 (docs) \u2014 Hermes install terminal with copy command and READY path. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates.",
+  "section_slug": "07-install",
+  "anchor": "#install"
+}

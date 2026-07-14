@@ -1,0 +1,44 @@
+{
+  "role": "surface",
+  "objective": "Hero first viewport: kicker, headline, CTAs, ready-check panel",
+  "strategy": "",
+  "index": 1,
+  "total": 8,
+  "steps": [
+    "Scope: lock definition of done for \u00abHero first viewport: kicker, headline, CTAs, ready-check panel\u00bb",
+    "Own only files for this axis (surface); do not edit sibling lanes",
+    "Ship interactive visual/UI slice with load-safe entry",
+    "Prove with manual open or paint/DOM smoke"
+  ],
+  "risks": [
+    "scope creep into sibling remnant territory",
+    "generic insights without executable steps",
+    "merge conflict with 7 parallel branch(es)"
+  ],
+  "acceptance": [
+    "Deliverable for \u00abHero first viewport: kicker, headline, CTAs, ready-check panel\u00bb is runnable or test-backed on the real path",
+    "Sibling lanes untouched (role=surface)",
+    "Ready for parent merge after host report"
+  ],
+  "files_hint": [
+    "likely-touch: *hero*",
+    "likely-touch: *first*",
+    "likely-touch: *viewport*",
+    "likely-touch: *kicker*"
+  ],
+  "key_decisions": [
+    "parallel branches: execute each work pack then merge once"
+  ],
+  "insights": [],
+  "progress_percent": 15.0,
+  "host_subagent_type": "general-purpose",
+  "host_capability_mode": "all",
+  "success_evidence": [
+    "report findings[] with concrete commands/paths/results",
+    "clone_handle set via spawn_ack",
+    "no sibling-lane file edits"
+  ],
+  "host_instruction": "Branch 2/8 (surface) \u2014 Hero first viewport: kicker, headline, CTAs, ready-check panel. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates.",
+  "section_slug": "02-hero",
+  "anchor": "#top"
+}

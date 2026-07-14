@@ -1,0 +1,44 @@
+{
+  "role": "polish",
+  "objective": "Manifesto, final CTA, footer, a11y progress skip focus OG",
+  "strategy": "",
+  "index": 7,
+  "total": 8,
+  "steps": [
+    "Scope: lock definition of done for \u00abManifesto, final CTA, footer, a11y progress skip focus OG\u00bb",
+    "Own only files for this axis (polish); do not edit sibling lanes",
+    "Responsive collapse, contrast, reduced-motion, asset paths",
+    "Serve locally and capture URL / HTTP 200 as evidence"
+  ],
+  "risks": [
+    "scope creep into sibling remnant territory",
+    "generic insights without executable steps",
+    "merge conflict with 7 parallel branch(es)"
+  ],
+  "acceptance": [
+    "Deliverable for \u00abManifesto, final CTA, footer, a11y progress skip focus OG\u00bb is runnable or test-backed on the real path",
+    "Sibling lanes untouched (role=polish)",
+    "Ready for parent merge after host report"
+  ],
+  "files_hint": [
+    "likely-touch: *manifesto*",
+    "likely-touch: *final*",
+    "likely-touch: *cta*",
+    "likely-touch: *footer*"
+  ],
+  "key_decisions": [
+    "parallel branches: execute each work pack then merge once"
+  ],
+  "insights": [],
+  "progress_percent": 15.0,
+  "host_subagent_type": "general-purpose",
+  "host_capability_mode": "all",
+  "success_evidence": [
+    "report findings[] with concrete commands/paths/results",
+    "clone_handle set via spawn_ack",
+    "no sibling-lane file edits"
+  ],
+  "host_instruction": "Branch 8/8 (polish) \u2014 Manifesto, final CTA, footer, a11y progress skip focus OG. Host spawn: general-purpose/all. Do real work in this lane only; report evidence, not pack templates.",
+  "section_slug": "08-close",
+  "anchor": "#close"
+}
