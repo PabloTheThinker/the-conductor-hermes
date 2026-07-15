@@ -630,8 +630,11 @@ def _recipe(mode: str) -> dict[str, Any]:
             "(wave C; waves field on fanout payload)",
             "4. remnant_orchestrate action=spawn_ack handles=[{remnant_id, clone_handle}]",
             "5. When each clone finishes: remnant_orchestrate action=report",
-            "6. remnant_orchestrate action=merge when await ready",
-            "7. memory_episodic + track resolve",
+            "6. remnant_orchestrate action=merge when await ready "
+            "(force+accept_theater only when host never spawned / theater)",
+            "7. terminate abandoned remnants (action=terminate) instead of "
+            "leaving awaiting_host forever",
+            "8. memory_episodic + track resolve",
         ],
         "forbidden_unless_needed": [
             "pillar_status spam",

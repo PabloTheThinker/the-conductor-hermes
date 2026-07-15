@@ -342,6 +342,32 @@ _STRONG_FAIL_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b(?:http\s*)?status(?:\s*code)?[:\s]+(?:401|403|404|429|5\d\d)\b", re.I),
 )
 
+# Tools whose success payload is almost always a content dump (source, search
+# hits, docs). Their bodies embed strong markers (regex fixtures, tests,
+# comments) and must not body-scan unless the host marked failure.
+_DUMP_TOOL_NAMES = frozenset(
+    {
+        "read_file",
+        "search_files",
+        "web_extract",
+        "web_search",
+        "open_page",
+        "open_page_with_find",
+        "session_search",
+        "skill_view",
+        "skills_list",
+        "memory",
+        "memory_episodic",
+        "x_search",
+        "vision_analyze",
+        "research_view",
+        "research_list",
+    }
+)
+
+# Hermes read_file style: "12|content"
+_LINE_DUMP_RE = re.compile(r"(?m)^\s*\d+\|")
+
 _OK_STATUSES = frozenset(
     {
         "ok",
@@ -368,6 +394,22 @@ _ERR_STATUSES = frozenset(
 )
 
 
+def _looks_like_success_dump(text: str, tool_name: str = "") -> bool:
+    """True when body is a content dump that must not be substring-scanned.
+
+    Reading hermes_bridge.py / path_safety.py embeds ``permission denied`` and
+    ``no such file or directory`` as source — those must not open scars.
+    """
+    tn = (tool_name or "").strip().lower()
+    if tn in _DUMP_TOOL_NAMES:
+        return True
+    # Line-numbered dumps (Hermes read_file: ``12|line``)
+    sample = text[:5000]
+    if len(_LINE_DUMP_RE.findall(sample)) >= 3:
+        return True
+    return False
+
+
 def tool_result_looks_failed(
     result: Any,
     *,
@@ -382,8 +424,10 @@ def tool_result_looks_failed(
     host ``status`` wins when present; JSON dicts fail only with truthy ``error``
     or non-zero ``exit_code``; JSON arrays never fail via body scan; plain text
     requires strong markers — never bare substring ``error``.
+
+    Dump tools (``read_file``, ``search_files``, …) and line-numbered file
+    dumps never fail via body scan alone — host status/error_type only.
     """
-    del tool_name  # reserved for future tool-specific heuristics
     if not isinstance(result, str) or not result.strip():
         # Host error markers without a body still count.
         if error_type is not None and str(error_type).strip():
@@ -447,8 +491,14 @@ def tool_result_looks_failed(
         # Hermes observer: no error key → ok (do not substring-scan body).
         return False
 
+    # Success content dumps: never body-scan strong markers.
+    if _looks_like_success_dump(text, tool_name):
+        return False
+
+    # Plain-text error envelopes: prefer leading lines (real tool errors lead).
+    lead = "\n".join(text.splitlines()[:12])[:800]
     for pat in _STRONG_FAIL_RES:
-        if pat.search(head):
+        if pat.search(lead) or pat.search(head[:400]):
             return True
     return False
 

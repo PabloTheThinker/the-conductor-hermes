@@ -10,6 +10,8 @@ from conductor.session.store import SessionStore
 from conductor.tracks.models import EDGE_RELATIONS, TrackEdge, TrackRecord
 
 TRACKS_META_KEY = "tracks"
+# Soft cap — drop oldest pruned/archived first, then oldest low-priority actives.
+TRACK_MAX_ITEMS = 200
 
 
 def _clamp(value: float) -> float:
@@ -18,6 +20,13 @@ def _clamp(value: float) -> float:
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _updated_ts(track: TrackRecord) -> float:
+    try:
+        return track.updated_at.timestamp()
+    except Exception:  # noqa: BLE001
+        return 0.0
 
 
 class TrackStore:
@@ -30,6 +39,30 @@ class TrackStore:
 
     def _save_all(self, agent_session_id: str, data: dict[str, Any]) -> None:
         self._store.set_meta(agent_session_id, TRACKS_META_KEY, data)
+
+    def _enforce_cap(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Keep graph under TRACK_MAX_ITEMS without discarding active high-priority work."""
+        items = [i for i in (data.get("items") or []) if isinstance(i, dict)]
+        if len(items) <= TRACK_MAX_ITEMS:
+            return data
+        records = [TrackRecord.model_validate(i) for i in items]
+        # Prefer dropping pruned/archived first (oldest first), then lowest priority + oldest.
+        def drop_key(t: TrackRecord) -> tuple[int, float, float]:
+            tier = 0 if t.status in {"pruned", "archived"} else 1 if t.status == "resolved" else 2
+            return (tier, t.priority, _updated_ts(t))
+
+        keep_sorted = sorted(records, key=drop_key, reverse=True)
+        kept = keep_sorted[:TRACK_MAX_ITEMS]
+        keep_ids = {t.track_id for t in kept}
+        data["items"] = [t.model_dump(mode="json") for t in kept]
+        # Drop edges that reference removed nodes
+        edges = [e for e in (data.get("edges") or []) if isinstance(e, dict)]
+        data["edges"] = [
+            e
+            for e in edges
+            if e.get("from_track_id") in keep_ids and e.get("to_track_id") in keep_ids
+        ]
+        return data
 
     def list_tracks(
         self,
@@ -45,7 +78,8 @@ class TrackStore:
             tracks = [t for t in tracks if t.status == status]
         elif not include_pruned:
             tracks = [t for t in tracks if t.status not in {"pruned", "archived"}]
-        return sorted(tracks, key=lambda t: (-t.priority, t.updated_at), reverse=False)
+        # High priority first; among ties, newest updated first
+        return sorted(tracks, key=lambda t: (-t.priority, -_updated_ts(t)))
 
     def get_track(self, agent_session_id: str, track_id: str) -> TrackRecord | None:
         needle = track_id.strip()
@@ -106,6 +140,7 @@ class TrackStore:
         items: list[Any] = list(data.get("items") or [])
         items.append(track.model_dump(mode="json"))
         data["items"] = items
+        data = self._enforce_cap(data)
         self._save_all(agent_session_id, data)
         return track
 
@@ -191,12 +226,12 @@ class TrackStore:
             parent.track_id,
             conductor_notes=(parent.conductor_notes + f" | forked→{child.track_id[:8]}").strip(" |"),
         )
-        # Graph edge: parent → child
+        # Graph edge: child -[forked_from]→ parent (child was forked from parent)
         try:
             self.link_tracks(
                 agent_session_id,
-                parent.track_id,
                 child.track_id,
+                parent.track_id,
                 relation="forked_from",
                 strength=0.9,
                 reason=f"fork: {child.title[:80]}",
@@ -356,9 +391,11 @@ class TrackStore:
         pruned = [t for t in tracks if t.status == "pruned"]
         resolved = [t for t in tracks if t.status == "resolved"]
         forked = [t for t in tracks if t.parent_id]
+        by_id = {t.track_id: t for t in tracks}
+        edges = self.list_edges(agent_session_id)
 
-        def _row(t: TrackRecord) -> dict[str, Any]:
-            return {
+        def _row(t: TrackRecord, **extra: Any) -> dict[str, Any]:
+            row = {
                 "id": t.track_id,
                 "short": t.track_id[:8],
                 "title": t.title,
@@ -372,25 +409,68 @@ class TrackStore:
                 "valence": t.emotional_valence,
                 "notes": t.conductor_notes[:120],
             }
+            row.update(extra)
+            return row
 
-        # Risk: high priority + low confidence
-        risks = [
-            _row(t)
-            for t in active
-            if t.priority >= 0.6 and t.confidence < 0.55
-        ]
+        # Graph pressure: who is blocked / who conflicts
+        blocked_ids: dict[str, list[str]] = {}  # target ← blockers
+        conflict_pairs: list[tuple[str, str, float]] = []
+        for e in edges:
+            if e.relation == "blocks":
+                blocked_ids.setdefault(e.to_track_id, []).append(e.from_track_id)
+            elif e.relation == "conflicts_with":
+                conflict_pairs.append((e.from_track_id, e.to_track_id, e.strength))
+
+        # Risk: high priority + low confidence OR actively blocked
+        risk_rows: list[dict[str, Any]] = []
+        for t in active:
+            reasons: list[str] = []
+            if t.priority >= 0.6 and t.confidence < 0.55:
+                reasons.append("high_priority_low_confidence")
+            if t.track_id in blocked_ids:
+                reasons.append("blocked")
+            if not reasons:
+                continue
+            risk_rows.append(
+                _row(
+                    t,
+                    risk_reasons=reasons,
+                    blocked_by=[bid[:8] for bid in blocked_ids.get(t.track_id, [])[:4]],
+                )
+            )
+        risk_rows.sort(key=lambda r: (-float(r["priority"]), float(r["confidence"])))
+
         opportunities = [
             _row(t)
             for t in active
-            if t.priority >= 0.7 and t.confidence >= 0.7
+            if t.priority >= 0.7 and t.confidence >= 0.7 and t.track_id not in blocked_ids
         ]
+        opportunities.sort(key=lambda r: (-float(r["priority"]), -float(r["confidence"])))
+
+        blocked = [
+            _row(by_id[tid], blocked_by=[b[:8] for b in blockers[:4]])
+            for tid, blockers in blocked_ids.items()
+            if tid in by_id and by_id[tid].status == "active"
+        ]
+        conflicts = [
+            {
+                "a": a[:8],
+                "b": b[:8],
+                "strength": strength,
+                "titles": [
+                    (by_id[a].title if a in by_id else a[:8]),
+                    (by_id[b].title if b in by_id else b[:8]),
+                ],
+            }
+            for a, b, strength in conflict_pairs[:12]
+        ]
+
         # Roots with children
         by_root: dict[str, list[dict[str, Any]]] = {}
         for t in tracks:
             root = t.root_id or t.track_id
             by_root.setdefault(root, []).append(_row(t))
 
-        edges = self.list_edges(agent_session_id)
         edge_rows = [
             {
                 "id": e.edge_id[:8],
@@ -410,12 +490,17 @@ class TrackStore:
                 "resolved": len(resolved),
                 "forked_nodes": len(forked),
                 "edges": len(edges),
-                "risks": len(risks),
+                "risks": len(risk_rows),
                 "opportunities": len(opportunities),
+                "blocked": len(blocked),
+                "conflicts": len(conflicts),
+                "max_items": TRACK_MAX_ITEMS,
             },
             "active": [_row(t) for t in active[:20]],
-            "risks": risks[:10],
+            "risks": risk_rows[:10],
             "opportunities": opportunities[:10],
+            "blocked": blocked[:10],
+            "conflicts": conflicts[:10],
             "edges": edge_rows,
             "lineages": [
                 {"root": k[:8], "nodes": v} for k, v in list(by_root.items())[:12]
@@ -428,7 +513,8 @@ class TrackStore:
         lines = [
             "◆ Track Chessboard",
             f"  Active {s['active']} · Resolved {s['resolved']} · Pruned {s['pruned']} · "
-            f"Edges {s.get('edges', 0)} · Risks {s['risks']} · Opportunities {s['opportunities']}",
+            f"Edges {s.get('edges', 0)} · Risks {s['risks']} · Blocked {s.get('blocked', 0)} · "
+            f"Opportunities {s['opportunities']}",
             "",
         ]
         if board["active"]:
@@ -439,9 +525,22 @@ class TrackStore:
                     f"[{row['status']}] {row['title']}"
                 )
         if board["risks"]:
-            lines.append("Risks (high priority / low confidence):")
+            lines.append("Risks (priority/confidence + blocked):")
             for row in board["risks"][:6]:
-                lines.append(f"  ⚠ {row['short']}  {row['title']}")
+                why = ",".join(row.get("risk_reasons") or []) or "risk"
+                lines.append(f"  ⚠ {row['short']}  {row['title']}  ({why})")
+        if board.get("blocked"):
+            lines.append("Blocked:")
+            for row in board["blocked"][:6]:
+                by = ",".join(row.get("blocked_by") or []) or "?"
+                lines.append(f"  ⛔ {row['short']}  {row['title']}  ← {by}")
+        if board.get("conflicts"):
+            lines.append("Conflicts:")
+            for row in board["conflicts"][:6]:
+                lines.append(
+                    f"  ⚔ {row['a']} ↔ {row['b']}  s={row['strength']:.2f}  "
+                    f"{row['titles'][0][:40]} / {row['titles'][1][:40]}"
+                )
         if board["opportunities"]:
             lines.append("Opportunities:")
             for row in board["opportunities"][:6]:

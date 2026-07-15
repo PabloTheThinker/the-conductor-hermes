@@ -22,6 +22,8 @@ class MemoryFabric:
         self.procedural = ProceduralStore(store)
 
     def status(self, session_id: str = "") -> dict[str, Any]:
+        from conductor.memory.episodic import EPISODIC_MAX_ITEMS
+
         skills = skills_index()
         seals = list_global_seals(limit=50)
         out: dict[str, Any] = {
@@ -32,18 +34,44 @@ class MemoryFabric:
                 "track_linked": "tracks + episodic tags",
             },
             "global_seals": len(seals),
+            "global_seal_samples": [
+                {"kind": s.kind, "hits": s.hits, "statement": s.statement[:100]}
+                for s in seals[:5]
+            ],
             "bundled_skills": len(skills),
             "skill_names": [s.name for s in skills[:20]],
+            "episodic_max_items": EPISODIC_MAX_ITEMS,
         }
         if session_id:
-            out["session"] = {
-                "episodic": len(self.episodic.list_entries(session_id, limit=1000)),
+            eps = self.episodic.list_entries(session_id, limit=EPISODIC_MAX_ITEMS)
+            failures = sum(
+                1
+                for e in eps
+                if (e.outcome or "").lower() in {"failure", "fail", "error", "blocked"}
+            )
+            session: dict[str, Any] = {
+                "episodic": len(eps),
                 "semantic": len(self.semantic.list_notes(session_id, limit=1000)),
                 "procedural": len(self.procedural.list_entries(session_id, limit=500)),
+                "episodic_failures": failures,
             }
-            recent = self.episodic.recent_slice(session_id, limit=3)
+            try:
+                from conductor.tracks.store import TrackStore
+
+                session["tracks"] = len(TrackStore(self.store).list_tracks(session_id))
+            except Exception:  # noqa: BLE001
+                session["tracks"] = 0
+            out["session"] = session
+            # Prefer valence-ranked inject selection for "what matters"
+            recent = self.episodic.select_for_inject(session_id, limit=3)
             out["recent_episodic"] = [
-                {"id": e.entry_id[:8], "content": e.content[:80], "outcome": e.outcome}
+                {
+                    "id": e.entry_id[:8],
+                    "content": e.content[:80],
+                    "outcome": e.outcome,
+                    "emotion": e.emotional_valence.primary,
+                    "intensity": e.emotional_valence.intensity,
+                }
                 for e in recent
             ]
         return out

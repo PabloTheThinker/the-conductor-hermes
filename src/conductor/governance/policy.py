@@ -29,6 +29,12 @@ class PolicyEngine:
         constitutional = evaluate_constitutional(text)
         constitutional_hit = next((v for v in constitutional if v.matched), None)
         if constitutional_hit:
+            ctx = {
+                **ctx,
+                "matched_constitutional_rules": [
+                    v.rule_id for v in constitutional if v.matched
+                ],
+            }
             return GateResult(
                 action_type=action_type,
                 tier="constitutional",

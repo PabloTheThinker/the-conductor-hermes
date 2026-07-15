@@ -66,13 +66,28 @@ def build_live_memory_block(
     except Exception:  # noqa: BLE001
         pass
 
-    # Recent episodic
+    # Recent / high-signal episodic (valence-aware ranking)
     try:
-        eps = EpisodicStore(store).list_entries(session_id, limit=max_episodes)
+        eps = EpisodicStore(store).select_for_inject(session_id, limit=max_episodes)
         if eps:
-            parts.append("### Recent episodes")
+            parts.append("### Recent episodes (valence-ranked)")
             for e in eps:
-                parts.append(f"- ({e.outcome}) {e.content[:120]}")
+                valence = e.emotional_valence
+                emo = f"{valence.primary}@{valence.intensity:.2f}"
+                parts.append(f"- ({e.outcome}|{emo}) {e.content[:120]}")
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Light procedural cue (how-to already learned this session)
+    try:
+        from conductor.memory.procedural import ProceduralStore
+
+        procs = ProceduralStore(store).list_entries(session_id, limit=2)
+        if procs:
+            parts.append("### Procedural cues")
+            for p in procs:
+                when = f" when: {p.when_to_use[:80]}" if p.when_to_use else ""
+                parts.append(f"- {p.name}{when}")
     except Exception:  # noqa: BLE001
         pass
 

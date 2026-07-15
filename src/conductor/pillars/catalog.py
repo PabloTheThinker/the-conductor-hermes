@@ -220,7 +220,8 @@ _reg(
         enhances="Host gets policy gates and structured Max Effort when stakes spike.",
         contracts=(
             "PolicyEngine + constitutional rules on high-risk actions",
-            "Audit trail of gate decisions",
+            "Audit trail + summary counts of gate decisions",
+            "governance_audit list|summary|evaluate",
             "Max Effort: Bellicus / Serena / Reason / Voice of Action",
             "Voice of Action requires owner + 24–48h + criteria",
             "Fable laws: evidence over narration",

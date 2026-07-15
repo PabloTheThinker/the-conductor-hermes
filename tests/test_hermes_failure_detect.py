@@ -89,3 +89,22 @@ def test_returncode_nonzero_counts_as_exit_fail():
     body = json.dumps({"returncode": 2, "output": "fail"})
     assert tool_result_looks_failed(body) is True
     assert tool_result_looks_failed(body, status="ok") is True
+
+
+def test_read_file_dump_with_embedded_permission_denied_is_ok():
+    """Source of path_safety / hermes_bridge must not open permission scars."""
+    lines = [
+        f'{i}|re.compile(r"\\bpermission denied\\b", re.I)' for i in range(1, 15)
+    ]
+    lines.append('15|re.compile(r"\\bno such file or directory\\b", re.I)')
+    body = "\n".join(lines)
+    assert tool_result_looks_failed(body, tool_name="read_file") is False
+    # Line-numbered dump heuristic even without tool_name
+    assert tool_result_looks_failed(body) is False
+    # Host error still wins
+    assert tool_result_looks_failed(body, tool_name="read_file", status="error") is True
+
+
+def test_search_files_dump_is_ok():
+    body = "path_safety.py:42:  permission denied by path safety floor\n"
+    assert tool_result_looks_failed(body, tool_name="search_files") is False

@@ -35,6 +35,25 @@ CONSTITUTIONAL_RULES: tuple[ConstitutionalRule, ...] = (
         re.compile(r"\b(edit|modify|overwrite|replace)\s+SOUL\.md\b", re.I),
         "Constitutional block: SOUL.md is immutable core identity",
     ),
+    ConstitutionalRule(
+        "no_credential_exfil",
+        re.compile(
+            r"\b(exfiltrate|dump|publish|post)\b.{0,40}\b("
+            r"api[_\s-]?keys?|private[_\s-]?keys?|secrets?\.env|auth\.json|"
+            r"credentials?|password\s+hashes?|ssh[_\s-]?private)\b",
+            re.I,
+        ),
+        "Constitutional block: credential / secret exfiltration is forbidden",
+    ),
+    ConstitutionalRule(
+        "no_force_push_main",
+        re.compile(
+            r"\b(git\s+push\s+.*--force|git\s+push\s+-f)\b.{0,40}\b(main|master)\b|"
+            r"\b(force[_\s-]?push)\b.{0,20}\b(main|master)\b",
+            re.I,
+        ),
+        "Constitutional block: force-push to main/master requires explicit human approval workflow",
+    ),
 )
 
 
@@ -46,3 +65,7 @@ def evaluate_constitutional(text: str) -> list[ConstitutionalVerdict]:
             ConstitutionalVerdict(rule_id=rule.rule_id, matched=matched, message=rule.message if matched else "")
         )
     return verdicts
+
+
+def constitutional_rule_ids() -> list[str]:
+    return [r.rule_id for r in CONSTITUTIONAL_RULES]

@@ -145,6 +145,7 @@ CONDUCTOR_TOOL_SCHEMAS: list[dict[str, Any]] = [
                             "merge_deep",
                             "fanout",
                             "compliance",
+                            "terminate",
                         ],
                     },
                     "accept_theater": {
@@ -207,7 +208,11 @@ CONDUCTOR_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     },
                     "remnant_id": {
                         "type": "string",
-                        "description": "Target remnant id (heartbeat|work|report|spawn_ack)",
+                        "description": "Target remnant id (heartbeat|work|report|spawn_ack|terminate)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional reason (terminate)",
                     },
                     "current_subtask": {"type": "string", "description": "Current subtask (heartbeat)"},
                     "progress_percent": {
@@ -274,7 +279,10 @@ CONDUCTOR_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "track_orchestrate",
-            "description": "Conductor Track System — create, list, update, and view strategic tracks.",
+            "description": (
+                "Conductor Track System — create/list/update/view/fork/prune/resolve tracks; "
+                "link graph edges; chessboard (json|text). Fork edge: child -[forked_from]→ parent."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -316,6 +324,14 @@ CONDUCTOR_TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "priority": {"type": "number"},
                     "confidence": {"type": "number"},
                     "status": {"type": "string"},
+                    "include_pruned": {
+                        "type": "boolean",
+                        "description": "list action: include pruned/archived (default true)",
+                    },
+                    "format": {
+                        "type": "string",
+                        "description": "chessboard action: json (default) | text",
+                    },
                     "conductor_notes": {"type": "string"},
                     "reason": {"type": "string"},
                 },
@@ -327,13 +343,24 @@ CONDUCTOR_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "ethics_evaluate",
-            "description": "Run the 7-point Ethics Decision Checklist for a proposed high-stakes action.",
+            "description": (
+                "Run the 7-point Ethics Decision Checklist for a proposed action. "
+                "High-stakes action_types escalate on any concern unless human_acknowledged."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action_type": {"type": "string"},
                     "description": {"type": "string"},
                     "human_acknowledged": {"type": "boolean"},
+                    "high_stakes": {
+                        "type": "boolean",
+                        "description": "Force high-stakes escalation policy for unknown action_type.",
+                    },
+                    "skip_audit": {
+                        "type": "boolean",
+                        "description": "If true, accountability point raises concern (prefer false).",
+                    },
                 },
                 "required": ["action_type", "description"],
             },
@@ -343,10 +370,32 @@ CONDUCTOR_TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "governance_audit",
-            "description": "List governance decision audit records for the current session.",
+            "description": (
+                "Governance: list audit records, summary counts, or evaluate+record a gate. "
+                "action=list|summary|evaluate (default list)."
+            ),
             "parameters": {
                 "type": "object",
-                "properties": {"limit": {"type": "integer"}},
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "summary", "evaluate"],
+                        "description": "list (default) | summary | evaluate",
+                    },
+                    "limit": {"type": "integer"},
+                    "action_type": {
+                        "type": "string",
+                        "description": "Required for evaluate — e.g. remnant_merge, status_check",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Text evaluated by constitutional + ethics gates",
+                    },
+                    "human_acknowledged": {
+                        "type": "boolean",
+                        "description": "Operator ack for escalation-gated actions",
+                    },
+                },
             },
         },
     },
@@ -820,6 +869,8 @@ def _remnant_orchestrate(
                     session_id,
                     remnant_ids=remnant_ids,
                     human_acknowledged=bool(args.get("human_acknowledged", False)),
+                    force=bool(args.get("force", False)),
+                    accept_theater=bool(args.get("accept_theater", False)),
                 )
             )
         if action == "merge_deep":
@@ -832,6 +883,19 @@ def _remnant_orchestrate(
                     objective=str(args.get("objective", "")).strip(),
                     human_acknowledged=bool(args.get("human_acknowledged", False)),
                     run_rbmc=bool(args.get("run_rbmc", True)),
+                    force=bool(args.get("force", False)),
+                    accept_theater=bool(args.get("accept_theater", False)),
+                )
+            )
+        if action == "terminate":
+            rid = str(args.get("remnant_id") or "").strip()
+            if not rid:
+                return "Error: remnant_id required for terminate"
+            return conductor.format_json(
+                conductor.terminate_remnant(
+                    session_id,
+                    remnant_id=rid,
+                    reason=str(args.get("reason") or args.get("objective") or "").strip(),
                 )
             )
         return f"Error: unknown action {action}"
@@ -864,7 +928,14 @@ def _track_orchestrate(
         )
         return conductor.format_json(track.model_dump(mode="json"))
     if action == "list":
-        return conductor.format_json([t.model_dump(mode="json") for t in tracks.list_tracks(session_id)])
+        include_pruned = True
+        if args.get("include_pruned") is not None:
+            include_pruned = bool(args.get("include_pruned"))
+        status = str(args.get("status") or "").strip() or None
+        rows = tracks.list_tracks(
+            session_id, status=status, include_pruned=include_pruned
+        )
+        return conductor.format_json([t.model_dump(mode="json") for t in rows])
     if action == "view":
         tid = str(args.get("track_id", "")).strip()
         track = tracks.get_track(session_id, tid)
@@ -923,6 +994,9 @@ def _track_orchestrate(
             return f"Error: track not found {tid}"
         return conductor.format_json(resolved.model_dump(mode="json"))
     if action == "chessboard":
+        fmt = str(args.get("format") or args.get("fmt") or "json").strip().lower()
+        if fmt in {"text", "txt", "human"}:
+            return tracks.chessboard_text(session_id)
         return conductor.format_json(tracks.chessboard(session_id))
     if action == "link":
         src = str(args.get("from_track_id") or args.get("track_id") or "").strip()
@@ -1015,21 +1089,17 @@ def _memory_episodic(
         query = str(args.get("query") or args.get("q") or args.get("content") or "").strip()
         limit = int(args.get("limit", 20))
         tag = str(args.get("tag", "")).strip() or None
-        if not query and not tag:
-            return "Error: query or tag required for search"
-        entries = episodic.list_entries(session_id, limit=10_000)
-        if tag:
-            entries = [e for e in entries if tag in (e.tags or [])]
-        if query:
-            qlow = query.lower()
-            entries = [
-                e
-                for e in entries
-                if qlow in (e.content or "").lower()
-                or qlow in (e.context or "").lower()
-                or any(qlow in str(t).lower() for t in (e.tags or []))
-            ]
-        return conductor.format_json([e.model_dump(mode="json") for e in entries[:limit]])
+        outcome = str(args.get("outcome", "")).strip() or None
+        if not query and not tag and not outcome:
+            return "Error: query, tag, or outcome required for search"
+        entries = episodic.query(
+            session_id,
+            tag=tag,
+            outcome=outcome,
+            content=query or None,
+            limit=limit,
+        )
+        return conductor.format_json([e.model_dump(mode="json") for e in entries])
     if action == "export":
         return conductor.format_json(export_task_scoped_slice(store, session_id))  # type: ignore[arg-type]
     if action == "consolidate":
@@ -1150,14 +1220,16 @@ def _ethics_evaluate(
     description = str(args.get("description", "")).strip()
     if not action_type or not description:
         return "Error: action_type and description required"
+    context: dict[str, Any] = {
+        "description": description,
+        "human_acknowledged": bool(args.get("human_acknowledged", False)),
+    }
+    if "high_stakes" in args:
+        context["high_stakes"] = bool(args.get("high_stakes"))
+    if args.get("skip_audit") or args.get("no_audit") or args.get("no_audit_trail"):
+        context["skip_audit"] = True
     conductor = _conductor(store)
-    gate = conductor.evaluate_governance(
-        action_type,
-        {
-            "description": description,
-            "human_acknowledged": bool(args.get("human_acknowledged", False)),
-        },
-    )
+    gate = conductor.evaluate_governance(action_type, context)
     if session_id:
         conductor.record_governance_gate(
             session_id,
@@ -1168,6 +1240,12 @@ def _ethics_evaluate(
     payload = gate.model_dump(mode="json")
     if gate.ethics:
         payload["ethics_points"] = [p.model_dump(mode="json") for p in gate.ethics.points]
+        try:
+            from conductor.ethics.evaluator import format_ethics_brief
+
+            payload["ethics_brief"] = format_ethics_brief(gate.ethics)
+        except Exception:  # noqa: BLE001
+            pass
     return conductor.format_json(payload)
 
 
@@ -1180,6 +1258,28 @@ def _governance_audit(
     if not session_id:
         return "Error: no agent session context for governance_audit"
     conductor = _conductor(store)
+    action = str(args.get("action") or "list").strip().lower()
+    if action in ("summary", "stats"):
+        return conductor.format_json(conductor.audit_summary(session_id))
+    if action in ("evaluate", "check", "gate"):
+        action_type = str(args.get("action_type") or "").strip()
+        description = str(args.get("description") or "").strip()
+        if not action_type or not description:
+            return "Error: evaluate requires action_type and description"
+        ctx: dict[str, Any] = {
+            "description": description,
+            "human_acknowledged": bool(args.get("human_acknowledged")),
+        }
+        gate = conductor.evaluate_governance(action_type, ctx)
+        conductor.record_governance_gate(
+            session_id, action_type=action_type, context=ctx, gate=gate
+        )
+        payload = gate.model_dump(mode="json")
+        if gate.ethics:
+            payload["ethics_points"] = [
+                p.model_dump(mode="json") for p in gate.ethics.points
+            ]
+        return conductor.format_json(payload)
     limit = int(args.get("limit", 15))
     records = conductor.list_audit_records(session_id, limit=limit)
     return conductor.format_json([r.model_dump(mode="json") for r in records])

@@ -44,6 +44,11 @@ REMNANT_SNAPSHOTS_KEY = "remnant_snapshots"
 REMNANT_HEARTBEATS_KEY = "remnant_heartbeats"
 MERGED_INSIGHTS_KEY = "merged_remnant_insights"
 MERGE_LOG_KEY = "remnant_merge_log"
+# Soft caps — keep session meta bounded under long-running fanouts
+REMNANT_HEARTBEATS_MAX = 200
+REMNANT_MERGE_LOG_MAX = 50
+# Age (seconds) after which non-ready clones are flagged stale in readiness
+REMNANT_STALE_WARNING_SECONDS = 3600
 
 
 def _utcnow() -> datetime:
@@ -667,12 +672,25 @@ class RemnantLedger:
         # SPAWNED / AWAITING_HOST / RUNNING / PENDING = not merge-ready
         rows = []
         waiting = []
+        stale: list[str] = []
+        now = _utcnow()
         for r in active:
             st = r.clone_status
             is_ready = st in ready_states and st != CloneStatus.NONE
             # If never used clones (NONE) but has work_pack, treat as ready for merge
             if st == CloneStatus.NONE:
                 is_ready = True
+            age_s: float | None = None
+            if r.spawned_at is not None:
+                spawned = r.spawned_at
+                if spawned.tzinfo is None:
+                    spawned = spawned.replace(tzinfo=UTC)
+                age_s = max(0.0, (now - spawned).total_seconds())
+            is_stale = (
+                not is_ready
+                and age_s is not None
+                and age_s >= REMNANT_STALE_WARNING_SECONDS
+            )
             rows.append(
                 {
                     "remnant_id": r.remnant_id,
@@ -682,10 +700,14 @@ class RemnantLedger:
                     "clone_handle": r.clone_handle,
                     "ready": is_ready,
                     "has_result": bool(r.clone_result),
+                    "age_seconds": int(age_s) if age_s is not None else None,
+                    "stale": is_stale,
                 }
             )
             if not is_ready:
                 waiting.append(r.remnant_id)
+            if is_stale:
+                stale.append(r.remnant_id)
         # Spawn compliance attached for hosts that only poll readiness
         from conductor.core.spawn_compliance import assess_spawn_compliance
 
@@ -699,9 +721,17 @@ class RemnantLedger:
             "ready": len(waiting) == 0 and len(rows) > 0,
             "total": len(rows),
             "waiting": waiting,
+            "stale": stale,
+            "stale_warning_seconds": REMNANT_STALE_WARNING_SECONDS,
             "clones": rows,
             "spawn_compliance": compliance,
             "theater_risk": bool(compliance.get("theater_risk")),
+            "hint": (
+                "terminate idle remnants or report/force-merge if clones stay awaiting_host "
+                f">={REMNANT_STALE_WARNING_SECONDS}s"
+                if stale
+                else None
+            ),
         }
 
     def spawn_compliance(
@@ -847,6 +877,8 @@ class RemnantLedger:
             remnants[resolved_id] = record.model_dump(mode="json")
             heartbeats: list[Any] = list(bundle.get("remnant_heartbeats") or [])
             heartbeats.append(heartbeat.model_dump(mode="json"))
+            if len(heartbeats) > REMNANT_HEARTBEATS_MAX:
+                heartbeats = heartbeats[-REMNANT_HEARTBEATS_MAX:]
             bundle["remnants"] = remnants
             bundle["remnant_heartbeats"] = heartbeats
             self._save_bundle(agent_session_id, bundle, full_meta)
@@ -857,6 +889,7 @@ class RemnantLedger:
                 "progress_percent": progress_percent,
                 "status": record.status.value,
                 "insights_count": len(heartbeat.new_insights),
+                "heartbeats_retained": len(heartbeats),
             }
 
     def list_remnants(
@@ -878,6 +911,183 @@ class RemnantLedger:
                 continue
             out.append(record)
         return sorted(out, key=lambda r: r.spawned_at)
+
+    def terminate_remnant(
+        self,
+        agent_session_id: str,
+        *,
+        remnant_id: str,
+        reason: str = "",
+        load_meta: Any,
+        save_meta: Any,
+    ) -> dict[str, Any]:
+        """Mark a remnant TERMINATED (abort path; not merge)."""
+        with self._lock:
+            full_meta = self._get_full_meta(agent_session_id, load_meta)
+            bundle = self._load_bundle(agent_session_id)
+            remnants: dict[str, Any] = dict(bundle.get("remnants") or {})
+            resolved_id = resolve_remnant_id(remnants, remnant_id)
+            raw = remnants.get(resolved_id)
+            if not raw:
+                raise ValueError(f"remnant not found: {remnant_id}")
+            record = RemnantRecord.model_validate(raw)
+            prior_status = record.status.value
+            prior_clone = record.clone_status.value
+            if record.status in {RemnantStatus.MERGED, RemnantStatus.TERMINATED}:
+                return {
+                    "action": "terminate",
+                    "remnant_id": resolved_id,
+                    "status": record.status.value,
+                    "clone_status": record.clone_status.value,
+                    "already_closed": True,
+                    "reason": reason or "",
+                }
+            record.status = RemnantStatus.TERMINATED
+            if record.clone_status in {
+                CloneStatus.AWAITING_HOST,
+                CloneStatus.SPAWNED,
+                CloneStatus.PENDING,
+                CloneStatus.RUNNING,
+            }:
+                # Stop host wait loops without claiming a successful report
+                record.clone_status = CloneStatus.FAILED
+            remnants[resolved_id] = record.model_dump(mode="json")
+            bundle["remnants"] = remnants
+            self._save_bundle(agent_session_id, bundle, full_meta)
+            save_meta(agent_session_id, full_meta)
+
+        note = (reason or "operator terminate").strip()
+        self.store.append_message(
+            agent_session_id,
+            "system",
+            f"[Remnant terminate] {resolved_id[:8]}… {note}".strip(),
+            extras={
+                "remnant_terminate": {
+                    "remnant_id": resolved_id,
+                    "prior_status": prior_status,
+                    "prior_clone_status": prior_clone,
+                    "reason": note,
+                }
+            },
+        )
+        record_lifecycle_event(
+            self.store,
+            agent_session_id,
+            kind="remnant_terminate",
+            content=f"terminated {resolved_id[:8]} ({prior_status}→terminated): {note}"[:300],
+            outcome="aborted",
+            emotion_primary="tension",
+            emotion_intensity=0.4,
+            context=resolved_id,
+            extra_tags=["remnant", "terminate"],
+        )
+        return {
+            "action": "terminate",
+            "remnant_id": resolved_id,
+            "status": RemnantStatus.TERMINATED.value,
+            "clone_status": record.clone_status.value,
+            "prior_status": prior_status,
+            "prior_clone_status": prior_clone,
+            "already_closed": False,
+            "reason": note,
+        }
+
+    @staticmethod
+    def _active_remnant_statuses() -> set[RemnantStatus]:
+        return {RemnantStatus.RUNNING, RemnantStatus.SPAWNING, RemnantStatus.SYNCING}
+
+    def _select_merge_targets(
+        self,
+        remnants_map: dict[str, Any],
+        *,
+        remnant_ids: list[str] | None,
+    ) -> list[RemnantRecord]:
+        active_statuses = self._active_remnant_statuses()
+        resolved_filter: set[str] | None = None
+        if remnant_ids:
+            resolved_filter = {resolve_remnant_id(remnants_map, token) for token in remnant_ids}
+
+        targets: list[RemnantRecord] = []
+        for rid, raw in remnants_map.items():
+            if not isinstance(raw, dict):
+                continue
+            record = RemnantRecord.model_validate(raw)
+            if resolved_filter is not None:
+                if rid not in resolved_filter:
+                    continue
+            elif record.status not in active_statuses:
+                continue
+            targets.append(record)
+
+        if not targets:
+            raise ValueError(
+                "no active remnants to merge — spawn first. "
+                "Order: remnant_orchestrate action=fanout (or spawn) → "
+                "PARENT host SPAWN (spawn_subagent / Hermes delegate_task) → "
+                "action=spawn_ack → action=report each clone → action=merge. "
+                "Merging without spawn is theater (no parallel work happened)."
+            )
+        return targets
+
+    def _assert_merge_gates(
+        self,
+        agent_session_id: str,
+        *,
+        targets: list[RemnantRecord],
+        full_meta: dict[str, Any],
+        load_meta: Any,
+        force: bool = False,
+        accept_theater: bool = False,
+    ) -> dict[str, Any]:
+        """Shared Tier1/2/3 gates: clone readiness + host-spawn compliance."""
+        readiness = self.clone_readiness(
+            agent_session_id,
+            load_meta=load_meta,
+            remnant_ids=[t.remnant_id for t in targets],
+        )
+        if not readiness.get("ready") and not force:
+            waiting = readiness.get("waiting") or []
+            raise ValueError(
+                "shadow clones not ready to merge — waiting on: "
+                f"{', '.join(w[:8] for w in waiting)}. "
+                "Do NOT stop the mission. Next: SPAWN host tools if still awaiting_host, "
+                "then action=report with real findings (not pack chrome), then merge. "
+                "force=true only if you accept incomplete clone evidence."
+            )
+
+        from conductor.core.spawn_compliance import (
+            assess_spawn_compliance,
+            merge_blocked_message,
+        )
+
+        host_req = bool(full_meta.get("host_spawn_required"))
+        compliance = assess_spawn_compliance(
+            targets,
+            host_spawn_required=host_req,
+            host_spawn_count=int(full_meta.get("host_spawn_count") or 0),
+        )
+        if host_req and compliance.get("theater_risk") and not (force and accept_theater):
+            raise ValueError(merge_blocked_message(compliance))
+        return {"readiness": readiness, "compliance": compliance}
+
+    def _heartbeats_for_targets(
+        self,
+        bundle: dict[str, Any],
+        targets: list[RemnantRecord],
+    ) -> list[ProgressHeartbeat]:
+        heartbeats_raw: list[Any] = list(bundle.get("remnant_heartbeats") or [])
+        target_ids = {t.remnant_id for t in targets}
+        heartbeats = [
+            ProgressHeartbeat.model_validate(hb)
+            for hb in heartbeats_raw
+            if isinstance(hb, dict) and hb.get("remnant_id") in target_ids
+        ]
+        for record in targets:
+            if record.current_heartbeat and record.current_heartbeat.heartbeat_id not in {
+                h.heartbeat_id for h in heartbeats
+            }:
+                heartbeats.append(record.current_heartbeat)
+        return heartbeats
 
     def merge_tier1(
         self,
@@ -912,77 +1122,16 @@ class RemnantLedger:
         full_meta = self._get_full_meta(agent_session_id, load_meta)
         bundle = self._load_bundle(agent_session_id)
         remnants_map: dict[str, Any] = dict(bundle.get("remnants") or {})
-        active_statuses = {RemnantStatus.RUNNING, RemnantStatus.SPAWNING, RemnantStatus.SYNCING}
-
-        resolved_filter: set[str] | None = None
-        if remnant_ids:
-            resolved_filter = {resolve_remnant_id(remnants_map, token) for token in remnant_ids}
-
-        targets: list[RemnantRecord] = []
-        for rid, raw in remnants_map.items():
-            if not isinstance(raw, dict):
-                continue
-            record = RemnantRecord.model_validate(raw)
-            if resolved_filter is not None:
-                if rid not in resolved_filter:
-                    continue
-            elif record.status not in active_statuses:
-                continue
-            targets.append(record)
-
-        if not targets:
-            raise ValueError(
-                "no active remnants to merge — spawn first. "
-                "Order: remnant_orchestrate action=fanout (or spawn) → "
-                "PARENT host SPAWN (spawn_subagent / Hermes delegate_task) → "
-                "action=spawn_ack → action=report each clone → action=merge. "
-                "Merging without spawn is theater (no parallel work happened)."
-            )
-
-        readiness = self.clone_readiness(
+        targets = self._select_merge_targets(remnants_map, remnant_ids=remnant_ids)
+        self._assert_merge_gates(
             agent_session_id,
+            targets=targets,
+            full_meta=full_meta,
             load_meta=load_meta,
-            remnant_ids=[t.remnant_id for t in targets],
+            force=force,
+            accept_theater=accept_theater,
         )
-        if not readiness.get("ready") and not force:
-            waiting = readiness.get("waiting") or []
-            raise ValueError(
-                "shadow clones not ready to merge — waiting on: "
-                f"{', '.join(w[:8] for w in waiting)}. "
-                "Do NOT stop the mission. Next: SPAWN host tools if still awaiting_host, "
-                "then action=report with real findings (not pack chrome), then merge. "
-                "force=true only if you accept incomplete clone evidence."
-            )
-
-        # Spawn compliance gate (1.18.6) — block merge theater
-        from conductor.core.spawn_compliance import (
-            assess_spawn_compliance,
-            merge_blocked_message,
-        )
-
-        host_req = bool(full_meta.get("host_spawn_required"))
-        compliance = assess_spawn_compliance(
-            targets,
-            host_spawn_required=host_req,
-            host_spawn_count=int(full_meta.get("host_spawn_count") or 0),
-        )
-        if host_req and compliance.get("theater_risk") and not (
-            force and accept_theater
-        ):
-            raise ValueError(merge_blocked_message(compliance))
-
-        heartbeats_raw: list[Any] = list(bundle.get("remnant_heartbeats") or [])
-        target_ids = {t.remnant_id for t in targets}
-        heartbeats = [
-            ProgressHeartbeat.model_validate(hb)
-            for hb in heartbeats_raw
-            if isinstance(hb, dict) and hb.get("remnant_id") in target_ids
-        ]
-        for record in targets:
-            if record.current_heartbeat and record.current_heartbeat.heartbeat_id not in {
-                h.heartbeat_id for h in heartbeats
-            }:
-                heartbeats.append(record.current_heartbeat)
+        heartbeats = self._heartbeats_for_targets(bundle, targets)
 
         track = self._tracks.ensure_default_track(agent_session_id)
         bumped = self._tracks.bump_version(agent_session_id, track.track_id) or track
@@ -1025,6 +1174,8 @@ class RemnantLedger:
         agent_session_id: str,
         *,
         remnant_ids: list[str] | None = None,
+        force: bool = False,
+        accept_theater: bool = False,
         load_meta: Any,
         save_meta: Any,
     ) -> dict[str, Any]:
@@ -1033,6 +1184,8 @@ class RemnantLedger:
             return self._merge_tier2_unlocked(
                 agent_session_id,
                 remnant_ids=remnant_ids,
+                force=force,
+                accept_theater=accept_theater,
                 load_meta=load_meta,
                 save_meta=save_meta,
             )
@@ -1042,49 +1195,24 @@ class RemnantLedger:
         agent_session_id: str,
         *,
         remnant_ids: list[str] | None = None,
+        force: bool = False,
+        accept_theater: bool = False,
         load_meta: Any,
         save_meta: Any,
     ) -> dict[str, Any]:
         full_meta = self._get_full_meta(agent_session_id, load_meta)
         bundle = self._load_bundle(agent_session_id)
         remnants_map: dict[str, Any] = dict(bundle.get("remnants") or {})
-        active_statuses = {RemnantStatus.RUNNING, RemnantStatus.SPAWNING, RemnantStatus.SYNCING}
-
-        resolved_filter: set[str] | None = None
-        if remnant_ids:
-            resolved_filter = {resolve_remnant_id(remnants_map, token) for token in remnant_ids}
-
-        targets: list[RemnantRecord] = []
-        for rid, raw in remnants_map.items():
-            if not isinstance(raw, dict):
-                continue
-            record = RemnantRecord.model_validate(raw)
-            if resolved_filter is not None:
-                if rid not in resolved_filter:
-                    continue
-            elif record.status not in active_statuses:
-                continue
-            targets.append(record)
-
-        if not targets:
-            raise ValueError(
-                "no active remnants to merge — spawn first. "
-                "Order: fanout/spawn → host SPAWN → spawn_ack → report → merge "
-                "(merge-without-spawn is theater)."
-            )
-
-        heartbeats_raw: list[Any] = list(bundle.get("remnant_heartbeats") or [])
-        target_ids = {t.remnant_id for t in targets}
-        heartbeats = [
-            ProgressHeartbeat.model_validate(hb)
-            for hb in heartbeats_raw
-            if isinstance(hb, dict) and hb.get("remnant_id") in target_ids
-        ]
-        for record in targets:
-            if record.current_heartbeat and record.current_heartbeat.heartbeat_id not in {
-                h.heartbeat_id for h in heartbeats
-            }:
-                heartbeats.append(record.current_heartbeat)
+        targets = self._select_merge_targets(remnants_map, remnant_ids=remnant_ids)
+        self._assert_merge_gates(
+            agent_session_id,
+            targets=targets,
+            full_meta=full_meta,
+            load_meta=load_meta,
+            force=force,
+            accept_theater=accept_theater,
+        )
+        heartbeats = self._heartbeats_for_targets(bundle, targets)
 
         track = self._tracks.ensure_default_track(agent_session_id)
         bumped = self._tracks.bump_version(agent_session_id, track.track_id) or track
@@ -1114,6 +1242,8 @@ class RemnantLedger:
         *,
         remnant_ids: list[str] | None = None,
         rbmc_result: dict[str, Any] | None = None,
+        force: bool = False,
+        accept_theater: bool = False,
         load_meta: Any,
         save_meta: Any,
     ) -> dict[str, Any]:
@@ -1123,6 +1253,8 @@ class RemnantLedger:
                 agent_session_id,
                 remnant_ids=remnant_ids,
                 rbmc_result=rbmc_result,
+                force=force,
+                accept_theater=accept_theater,
                 load_meta=load_meta,
                 save_meta=save_meta,
             )
@@ -1133,49 +1265,24 @@ class RemnantLedger:
         *,
         remnant_ids: list[str] | None = None,
         rbmc_result: dict[str, Any] | None = None,
+        force: bool = False,
+        accept_theater: bool = False,
         load_meta: Any,
         save_meta: Any,
     ) -> dict[str, Any]:
         full_meta = self._get_full_meta(agent_session_id, load_meta)
         bundle = self._load_bundle(agent_session_id)
         remnants_map: dict[str, Any] = dict(bundle.get("remnants") or {})
-        active_statuses = {RemnantStatus.RUNNING, RemnantStatus.SPAWNING, RemnantStatus.SYNCING}
-
-        resolved_filter: set[str] | None = None
-        if remnant_ids:
-            resolved_filter = {resolve_remnant_id(remnants_map, token) for token in remnant_ids}
-
-        targets: list[RemnantRecord] = []
-        for rid, raw in remnants_map.items():
-            if not isinstance(raw, dict):
-                continue
-            record = RemnantRecord.model_validate(raw)
-            if resolved_filter is not None:
-                if rid not in resolved_filter:
-                    continue
-            elif record.status not in active_statuses:
-                continue
-            targets.append(record)
-
-        if not targets:
-            raise ValueError(
-                "no active remnants to merge — spawn first. "
-                "Order: fanout/spawn → host SPAWN → spawn_ack → report → merge "
-                "(merge-without-spawn is theater)."
-            )
-
-        heartbeats_raw: list[Any] = list(bundle.get("remnant_heartbeats") or [])
-        target_ids = {t.remnant_id for t in targets}
-        heartbeats = [
-            ProgressHeartbeat.model_validate(hb)
-            for hb in heartbeats_raw
-            if isinstance(hb, dict) and hb.get("remnant_id") in target_ids
-        ]
-        for record in targets:
-            if record.current_heartbeat and record.current_heartbeat.heartbeat_id not in {
-                h.heartbeat_id for h in heartbeats
-            }:
-                heartbeats.append(record.current_heartbeat)
+        targets = self._select_merge_targets(remnants_map, remnant_ids=remnant_ids)
+        self._assert_merge_gates(
+            agent_session_id,
+            targets=targets,
+            full_meta=full_meta,
+            load_meta=load_meta,
+            force=force,
+            accept_theater=accept_theater,
+        )
+        heartbeats = self._heartbeats_for_targets(bundle, targets)
 
         track = self._tracks.ensure_default_track(agent_session_id)
         bumped = self._tracks.bump_version(agent_session_id, track.track_id) or track
@@ -1236,25 +1343,20 @@ class RemnantLedger:
 
         playbook = merge_host_playbook(targets, list(result.merged_insights))
 
-        # Track hygiene: close the board when all clones merged (AgentDrive: main only)
+        # Track hygiene: close the board when all remnants are inactive
         track_resolved = False
         track_resolve_status: str | None = None
         if result.success and result.new_track_id:
+            active_status_values = {
+                RemnantStatus.SPAWNING.value,
+                RemnantStatus.RUNNING.value,
+                RemnantStatus.SYNCING.value,
+            }
             still_active = [
                 rid
                 for rid, raw in remnants_map.items()
                 if isinstance(raw, dict)
-                and str(raw.get("status") or "")
-                in {
-                    RemnantStatus.SPAWNING.value,
-                    RemnantStatus.RUNNING.value,
-                    RemnantStatus.SYNCING.value,
-                    "awaiting_host",
-                    "spawned",
-                    "pending",
-                    "running",
-                    "spawning",
-                }
+                and str(raw.get("status") or "") in active_status_values
             ]
             if not still_active:
                 resolved = self._tracks.resolve_track(
@@ -1283,6 +1385,8 @@ class RemnantLedger:
                 },
             }
         )
+        if len(merge_log) > REMNANT_MERGE_LOG_MAX:
+            merge_log = merge_log[-REMNANT_MERGE_LOG_MAX:]
 
         bundle["remnants"] = remnants_map
         bundle["merged_remnant_insights"] = merged_insights

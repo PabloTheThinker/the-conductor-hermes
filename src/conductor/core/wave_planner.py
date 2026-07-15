@@ -121,6 +121,9 @@ WAVE_LABELS: dict[WaveId, str] = {
     "C": "delegate / remnant / host spawn",
 }
 
+# Bound plan_waves input so giant accidental lists do not explode context.
+MAX_WAVE_ITEMS = 64
+
 
 def classify_tool(tool_name: str, args: Any = None) -> ToolClass:
     """Return tool class for wave planning.
@@ -132,7 +135,10 @@ def classify_tool(tool_name: str, args: Any = None) -> ToolClass:
     if not name:
         return "barrier"
 
-    # remnant_orchestrate: status/list/heartbeat are reads; spawn/merge mutate
+    # remnant_orchestrate: action-aware class (P6)
+    #   A — status/list/heartbeat/await/protocol/compliance (reads)
+    #   B — report/merge/spawn_ack/terminate (local meta mutations)
+    #   C — fanout/spawn (host spawn path)
     if name == "remnant_orchestrate":
         action = ""
         if isinstance(args, dict):
@@ -146,6 +152,16 @@ def classify_tool(tool_name: str, args: Any = None) -> ToolClass:
             "compliance",
         }:
             return "safe_parallel"
+        if action in {
+            "report",
+            "merge",
+            "merge_reflective",
+            "merge_deep",
+            "spawn_ack",
+            "terminate",
+        }:
+            return "barrier"
+        # fanout / spawn / unknown mutate-or-spawn → wave C
         return "spawn"
 
     if name in _SPAWN:
@@ -210,16 +226,25 @@ def plan_waves(
     *,
     tool_key: str = "tool",
     args_key: str = "arguments",
+    max_items: int | None = None,
 ) -> dict[str, Any]:
     """Group planned tool calls into A/B/C waves.
 
     Each item is typically ``{tool, arguments, …}`` (Hermes-shaped) or a spawn
     request with nested ``tool_call``.
+
+    Caps input at ``max_items`` (default ``MAX_WAVE_ITEMS``) so unbounded
+    fanout lists cannot blow context. Truncation is reported in the summary.
     """
     waves: dict[WaveId, list[dict[str, Any]]] = {"A": [], "B": [], "C": []}
     annotated: list[dict[str, Any]] = []
+    raw_items = list(items or [])
+    cap = MAX_WAVE_ITEMS if max_items is None else max(1, int(max_items))
+    truncated = len(raw_items) > cap
+    if truncated:
+        raw_items = raw_items[:cap]
 
-    for idx, raw in enumerate(items or []):
+    for idx, raw in enumerate(raw_items):
         item = dict(raw or {})
         # Nested host spawn_request.tool_call
         tc = item.get("tool_call") if isinstance(item.get("tool_call"), dict) else None
@@ -253,6 +278,9 @@ def plan_waves(
         "B": len(waves["B"]),
         "C": len(waves["C"]),
         "total": len(annotated),
+        "capped_at": cap,
+        "truncated": truncated,
+        "input_count": len(items or []),
     }
 
     return {
@@ -277,14 +305,23 @@ def plan_waves(
                 "Wave C: prefer one hermes_batch / delegate_task(tasks=[…]) "
                 "over N serial spawns."
             ),
+            "advisory_only": True,
+            "not_a_scheduler": (
+                "Waves are labels + thrash batch ids — Hermes owns segmentation."
+            ),
         },
     }
 
 
-def _wave_guidance(summary: dict[str, int]) -> str:
+def _wave_guidance(summary: dict[str, Any]) -> str:
     parts = [
         f"Waves A={summary.get('A', 0)} B={summary.get('B', 0)} C={summary.get('C', 0)}."
     ]
+    if summary.get("truncated"):
+        parts.append(
+            f"Input truncated to {summary.get('capped_at')} of "
+            f"{summary.get('input_count')} items (MAX_WAVE_ITEMS)."
+        )
     if summary.get("C", 0) > 1:
         parts.append(
             "Multiple spawns → use one hermes_batch / delegate_task(tasks=[…]) this turn."
@@ -392,7 +429,7 @@ def hybrid_safe_preflight_pack(
             "Local/read preflight complete. Parent should deepen via host spawn "
             "(wave C) with this pack in context — do not re-scan the same paths."
         ),
-        "next_wave": "C" if True else "B",
+        "next_wave": "C",
         "host_note": (
             "Attach under work_pack.local_preflight; hybrid dispatch already "
             "enriches spawn prompts."

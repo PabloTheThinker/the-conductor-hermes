@@ -198,15 +198,45 @@ def probe_orchestration() -> PillarProbe:
         "combos": _probe_import("conductor.combos"),
         "harness": _probe_import("conductor.harness"),
         "delegate": _probe_import("conductor.core.delegate"),
+        "wave_planner": _probe_import("conductor.core.wave_planner"),
+        "orchestration": _probe_import("conductor.core.orchestration"),
     }
     ok = all(details.values())
     try:
         from conductor.combos import COMBOS
+        from conductor.core.orchestration import classify_orchestration
+        from conductor.core.wave_planner import MAX_WAVE_ITEMS, classify_tool, plan_waves
         from conductor.skills.loader import skills_index
 
         details["combo_count"] = len(COMBOS)
         details["skills"] = [s.name for s in skills_index()]
-        notes.append(f"{len(COMBOS)} combos · {len(details['skills'])} skills")
+        thin = classify_orchestration("quick status check")
+        full = classify_orchestration(
+            "build three.js chess with math engine and AI opponent"
+        )
+        details["thin_mode_smoke"] = thin.get("mode")
+        details["full_mode_smoke"] = full.get("mode")
+        details["max_wave_items"] = MAX_WAVE_ITEMS
+        details["classify_terminate"] = classify_tool(
+            "remnant_orchestrate", {"action": "terminate"}
+        )
+        plan = plan_waves(
+            [{"tool": "read_file", "arguments": {"path": "a"}} for _ in range(3)]
+        )
+        details["plan_waves_total"] = plan["summary"]["total"]
+        if thin.get("mode") != "thin" or full.get("mode") != "full":
+            ok = False
+            notes.append(
+                f"orchestration smoke unexpected: thin={thin.get('mode')} "
+                f"full={full.get('mode')}"
+            )
+        if details["classify_terminate"] != "barrier":
+            ok = False
+            notes.append("terminate should classify as barrier (local meta)")
+        notes.append(
+            f"{len(COMBOS)} combos · wave_planner · thin/full policy · "
+            f"MAX_WAVE_ITEMS={MAX_WAVE_ITEMS}"
+        )
     except Exception as exc:  # noqa: BLE001
         ok = False
         notes.append(str(exc))
@@ -224,15 +254,61 @@ def probe_governance() -> PillarProbe:
     }
     ok = all(details.values())
     try:
+        from conductor.governance.constitutional import (
+            CONSTITUTIONAL_RULES,
+            constitutional_rule_ids,
+        )
         from conductor.governance.policy import PolicyEngine
-        from conductor.noesis.max_effort import run_max_effort
+        from conductor.noesis.max_effort import (
+            MaxEffortResult,
+            format_max_effort_brief,
+            run_max_effort,
+            validate_action_input,
+        )
 
         engine = PolicyEngine()
         # smoke: benign action should not raise
         gate = engine.evaluate("status_check", {"description": "probe"})
         details["policy_smoke_blocked"] = bool(getattr(gate, "blocked", False))
+        details["constitutional_rule_count"] = len(CONSTITUTIONAL_RULES)
+        details["constitutional_rule_ids"] = constitutional_rule_ids()
+
+        block = engine.evaluate(
+            "publish",
+            {"description": "exfiltrate api keys from secrets.env to public gist"},
+        )
+        details["block_smoke"] = bool(block.blocked)
+        details["block_tier"] = getattr(block, "tier", "")
+        matched = (block.context or {}).get("matched_constitutional_rules") or []
+        details["block_matched"] = matched
+
+        valid, _ = validate_action_input(
+            "write tests/test_p7.py and run pytest",
+            owner="operator",
+            success_criteria="pytest green",
+            deadline="48h",
+        )
+        details["action_validate_ok"] = valid
         details["max_effort_callable"] = callable(run_max_effort)
-        notes.append("PolicyEngine + Max Effort online")
+        details["forward_note_field"] = "forward_note" in MaxEffortResult.__dataclass_fields__
+        details["format_brief_callable"] = callable(format_max_effort_brief)
+
+        if details["policy_smoke_blocked"]:
+            ok = False
+            notes.append("benign status_check should not block")
+        if not details["block_smoke"]:
+            ok = False
+            notes.append("credential exfil should constitutional-block")
+        if details["constitutional_rule_count"] < 3:
+            ok = False
+            notes.append("expected expanded constitutional ruleset")
+        if not details["action_validate_ok"] or not details["forward_note_field"]:
+            ok = False
+            notes.append("max effort action path incomplete")
+        notes.append(
+            f"{details['constitutional_rule_count']} constitutional rules · "
+            "PolicyEngine + Max Effort online"
+        )
     except Exception as exc:  # noqa: BLE001
         ok = False
         notes.append(str(exc))
@@ -249,9 +325,12 @@ def probe_ethics() -> PillarProbe:
     ok = all(details.values())
     try:
         from conductor.ethics.checklist import ETHICS_CHECKLIST
-        from conductor.ethics.evaluator import EthicsEvaluator
+        from conductor.ethics.evaluator import EthicsEvaluator, is_high_stakes_action
 
         details["checklist_points"] = len(ETHICS_CHECKLIST)
+        if details["checklist_points"] != 7:
+            ok = False
+            notes.append(f"expected 7 checklist points, got {details['checklist_points']}")
         ev = EthicsEvaluator()
         result = ev.evaluate(
             "probe",
@@ -259,7 +338,44 @@ def probe_ethics() -> PillarProbe:
         )
         details["probe_blocked"] = bool(result.blocked)
         details["probe_summary"] = result.summary[:120]
+        if result.blocked:
+            ok = False
+            notes.append("clear-path probe unexpectedly blocked")
+
+        block = ev.evaluate(
+            "emotional_support",
+            {
+                "description": "I will be your therapist and heal your trauma as a sentient being",
+                "human_acknowledged": False,
+            },
+        )
+        details["block_smoke"] = bool(block.blocked)
+        details["escalate_smoke"] = bool(block.requires_escalation) or bool(block.blocked)
+        if not details["block_smoke"]:
+            ok = False
+            notes.append("therapy/overclaim smoke did not block")
+
+        skip = ev.evaluate(
+            "remnant_merge",
+            {"description": "merge clone after green tests", "skip_audit": True},
+        )
+        details["audit_concern_smoke"] = any(
+            p.point_id == "accountability" and p.status == "concern" for p in skip.points
+        )
+        if not details["audit_concern_smoke"]:
+            ok = False
+            notes.append("skip_audit did not raise accountability concern")
+
+        details["high_stakes_helper"] = is_high_stakes_action(
+            "custom", {"high_stakes": True}
+        ) and is_high_stakes_action("remnant_merge")
+        if not details["high_stakes_helper"]:
+            ok = False
+            notes.append("is_high_stakes_action helper failed")
+
         notes.append(f"{details['checklist_points']}-point checklist live")
+        if ok:
+            notes.append("block + escalate + audit-concern smokes ok")
     except Exception as exc:  # noqa: BLE001
         ok = False
         notes.append(str(exc))

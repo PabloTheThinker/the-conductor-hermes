@@ -101,9 +101,10 @@ class SemanticStore:
         )
         data = self._load(session_id)
         items: list[Any] = list(data.get("items") or [])
-        # Dedupe identical statements
+        # Dedupe identical statements (case-insensitive)
+        needle = note.statement.casefold()
         for raw in items:
-            if isinstance(raw, dict) and raw.get("statement") == note.statement:
+            if isinstance(raw, dict) and str(raw.get("statement") or "").casefold() == needle:
                 return SemanticNote.model_validate(raw)
         items.append(note.model_dump(mode="json"))
         data["items"] = items

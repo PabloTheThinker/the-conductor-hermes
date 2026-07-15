@@ -43,8 +43,16 @@ assert info["resonant"] or info["mode"] == "solo"
 | Variable | Meaning |
 |----------|---------|
 | `CONDUCTOR_HOST_SOUL` | Path to meister soul file **or** inline body |
+| `CONDUCTOR_PARTNER_SOUL` | Path to Conductor **partner** soul file (wavelength). Required when meister and partner share a home directory. |
 | `CONDUCTOR_SOUL_MODE` | `resonate` (default) · `solo` · `host_only` |
 | `HERMES_HOME` / `OPENCLAW_HOME` | Search roots for `SOUL.md`, `IDENTITY.md`, `AGENTS.md` |
+
+Partner path resolution (``soul_path()``):
+
+1. `CONDUCTOR_PARTNER_SOUL` env (file)  
+2. `$CONDUCTOR_HOME/CONDUCTOR_PARTNER_SOUL.md`  
+3. `$CONDUCTOR_HOME/SOUL.md` only when partner-shaped and not the meister path  
+4. Package/canonical `SOUL.md`
 
 ### Overlay file
 
@@ -61,12 +69,14 @@ Used when auto-discovery finds no other host soul.
 ```bash
 export HERMES_HOME=~/.hermes
 export CONDUCTOR_HOME=$HERMES_HOME
-# Keep Hermes identity as meister, e.g. ~/.hermes/IDENTITY.md or AGENTS.md
-# Conductor partner SOUL is seeded as SOUL.md — resonance merges both into the module prompt
+export CONDUCTOR_HOST_SOUL="$HERMES_HOME/SOUL.md"              # meister
+export CONDUCTOR_PARTNER_SOUL="$HERMES_HOME/CONDUCTOR_PARTNER_SOUL.md"  # partner
+# Keep Hermes identity as meister (SOUL.md / IDENTITY.md / AGENTS.md)
+# Conductor partner is seeded as CONDUCTOR_PARTNER_SOUL.md — never overwrites meister
 conductor setup --harness hermes
 ```
 
-When homes are **shared**, Conductor will **not** treat its own partner `SOUL.md` as the meister. Prefer a distinct host file (`IDENTITY.md`, `AGENTS.md`, or `HOST_SOUL.md`).
+When homes are **shared**, Conductor will **not** treat meister `SOUL.md` as the partner wavelength. Partner is always `CONDUCTOR_PARTNER_SOUL.md` (or `CONDUCTOR_PARTNER_SOUL` env). Prefer a distinct host file when both exist (`IDENTITY.md`, `AGENTS.md`, or `HOST_SOUL.md`).
 
 ### OpenClaw / generic
 

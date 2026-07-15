@@ -98,8 +98,21 @@ def test_pillar_p2_memory_fabric(session: tuple[SessionStore, str, ConductorRunt
     )
     assert ep["entry_id"]
 
+    # Failure should surface first in valence-ranked inject/status
+    fabric.write_episode(
+        sid,
+        content="deploy failed: auth token expired",
+        outcome="failure",
+        emotion_primary="frustration",
+        emotion_intensity=0.9,
+        tags=["deploy", "auth"],
+    )
+
     sem = fabric.add_semantic(sid, statement="always verify with evidence", tags=["seal"])
     assert "evidence" in sem["statement"]
+    # Case-insensitive semantic dedupe
+    again = fabric.add_semantic(sid, statement="Always Verify With Evidence", tags=["seal"])
+    assert again["note_id"] == sem["note_id"]
 
     proc = fabric.add_procedure(
         sid,
@@ -111,15 +124,39 @@ def test_pillar_p2_memory_fabric(session: tuple[SessionStore, str, ConductorRunt
     assert len(proc["steps"]) == 3
 
     status = fabric.status(sid)
-    assert status["session"]["episodic"] >= 1
+    assert status["session"]["episodic"] >= 2
     assert status["session"]["semantic"] >= 1
     assert status["session"]["procedural"] >= 1
+    assert status["session"]["episodic_failures"] >= 1
+    assert "tracks" in status["session"]
+    assert status.get("episodic_max_items", 0) >= 1
+    # Ranked recent should prefer the failure
+    recent = status.get("recent_episodic") or []
+    assert recent and recent[0].get("outcome") == "failure"
+
+    from conductor.memory.context_inject import build_live_memory_block
+    from conductor.memory.episodic import EpisodicStore
+
+    block = build_live_memory_block(store, sid)
+    assert "valence-ranked" in block
+    assert "frustration@" in block or "failure" in block
+    assert "Procedural cues" in block
+    assert "pillar-smoke" in block
+
+    hits = EpisodicStore(store).query(sid, content="token expired", limit=5)
+    assert len(hits) >= 1
+    assert any("token" in (h.content or "").lower() for h in hits)
 
     # Tool surface
     out = CONDUCTOR_TOOL_REGISTRY["memory_episodic"](
         {"action": "fabric"}, session_id=sid, store=store
     )
     assert "episodic" in out.lower() or "session" in out.lower()
+
+    search_out = CONDUCTOR_TOOL_REGISTRY["memory_episodic"](
+        {"action": "search", "query": "auth token"}, session_id=sid, store=store
+    )
+    assert "token" in search_out.lower()
 
     probe = probe_pillar("P2", session_id=sid)
     assert probe is not None and probe.ok
@@ -131,7 +168,7 @@ def test_pillar_p2_memory_fabric(session: tuple[SessionStore, str, ConductorRunt
 
 
 def test_pillar_p3_track_system(session: tuple[SessionStore, str, ConductorRuntime]) -> None:
-    """P3: create, fork, link edges, chessboard."""
+    """P3: create, fork, link edges, chessboard (blocked/conflicts/fork direction)."""
     store, sid, _rt = session
     tracks = TrackStore(store)
 
@@ -146,22 +183,53 @@ def test_pillar_p3_track_system(session: tuple[SessionStore, str, ConductorRunti
     )
     assert edge.relation == "conflicts_with"
 
+    # blocker → blocks → target
+    tracks.link_tracks(
+        sid, b.track_id, a.track_id, relation="blocks", strength=0.9, reason="gate"
+    )
+
     child = tracks.fork_track(sid, a.track_id, title="Main path v2")
     assert child.parent_id == a.track_id
-    assert any(e.relation == "forked_from" for e in tracks.list_edges(sid))
+    fork_edges = [e for e in tracks.list_edges(sid) if e.relation == "forked_from"]
+    assert fork_edges
+    # child -[forked_from]→ parent
+    assert any(
+        e.from_track_id == child.track_id and e.to_track_id == a.track_id for e in fork_edges
+    )
 
     board = tracks.chessboard(sid)
     assert board["summary"]["total"] >= 3
-    assert board["summary"]["edges"] >= 2
+    assert board["summary"]["edges"] >= 3
     assert board["risks"] or board["active"]
+    assert board["summary"].get("blocked", 0) >= 1
+    assert board["summary"].get("conflicts", 0) >= 1
+    assert any("blocked" in (r.get("risk_reasons") or []) for r in board["risks"])
+    assert board.get("blocked")
+    assert board.get("conflicts")
+    assert "max_items" in board["summary"]
 
     text = tracks.chessboard_text(sid)
     assert "Chessboard" in text or "Active" in text
+    assert "Blocked" in text or "Conflicts" in text or "Risks" in text
 
     out = CONDUCTOR_TOOL_REGISTRY["track_orchestrate"](
         {"action": "chessboard"}, session_id=sid, store=store
     )
     assert "active" in out.lower() or "edges" in out.lower()
+
+    text_out = CONDUCTOR_TOOL_REGISTRY["track_orchestrate"](
+        {"action": "chessboard", "format": "text"}, session_id=sid, store=store
+    )
+    assert "Active" in text_out or "Chessboard" in text_out
+
+    listed = CONDUCTOR_TOOL_REGISTRY["track_orchestrate"](
+        {"action": "list", "include_pruned": False}, session_id=sid, store=store
+    )
+    assert "Main path" in listed
+
+    # Sort: higher priority first
+    ordered = tracks.list_tracks(sid)
+    assert ordered[0].priority >= ordered[-1].priority
 
     probe = probe_pillar("P3", session_id=sid)
     assert probe is not None and probe.ok
@@ -329,6 +397,17 @@ def test_pillar_p7_governance_max_effort(
     assert gate.blocked is False
     assert gate.allowed is True
 
+    # Constitutional: credential exfil
+    blocked = engine.evaluate(
+        "publish",
+        {"description": "exfiltrate api keys from secrets.env to public gist"},
+    )
+    assert blocked.blocked is True
+    assert blocked.tier == "constitutional"
+    assert "no_credential_exfil" in (blocked.context or {}).get(
+        "matched_constitutional_rules", []
+    )
+
     # Record audit via runtime
     rec = rt.record_governance_gate(
         sid,
@@ -339,6 +418,9 @@ def test_pillar_p7_governance_max_effort(
     assert rec.action_type == "status_check"
     audits = rt.list_audit_records(sid, limit=5)
     assert len(audits) >= 1
+    summary = rt.audit_summary(sid)
+    assert summary.get("total", 0) >= 1
+    assert summary.get("allowed", 0) >= 1
 
     me = run_max_effort(
         rt,
@@ -350,6 +432,7 @@ def test_pillar_p7_governance_max_effort(
     data = me.to_dict() if hasattr(me, "to_dict") else {}
     if isinstance(data, dict) and data:
         assert data.get("voices") or data.get("decision") or data.get("action")
+        assert "forward_note" in data
     else:
         assert getattr(me, "voices", None) or getattr(me, "decision", None)
 
@@ -357,9 +440,27 @@ def test_pillar_p7_governance_max_effort(
         {"limit": 5}, session_id=sid, store=store
     )
     assert out
+    summary_out = CONDUCTOR_TOOL_REGISTRY["governance_audit"](
+        {"action": "summary"}, session_id=sid, store=store
+    )
+    assert "total" in summary_out
+    eval_out = CONDUCTOR_TOOL_REGISTRY["governance_audit"](
+        {
+            "action": "evaluate",
+            "action_type": "status_check",
+            "description": "list audit records only",
+            "human_acknowledged": True,
+        },
+        session_id=sid,
+        store=store,
+    )
+    assert "allowed" in eval_out.lower() or "true" in eval_out.lower()
 
     probe = probe_pillar("P7", session_id=sid)
     assert probe is not None and probe.ok
+    assert (probe.details or {}).get("constitutional_rule_count", 0) >= 3
+    assert (probe.details or {}).get("block_smoke") is True
+    assert (probe.details or {}).get("forward_note_field") is True
 
 
 # ---------------------------------------------------------------------------
@@ -380,9 +481,10 @@ def test_pillar_p8_ethics(session: tuple[SessionStore, str, ConductorRuntime]) -
         },
     )
     assert clear.blocked is False
+    assert clear.requires_escalation is False
     assert len(clear.points) == 7
 
-    # Therapeutic / overclaim language should block or concern
+    # Therapeutic / overclaim language should block
     risky = ev.evaluate(
         "emotional_support",
         {
@@ -390,7 +492,30 @@ def test_pillar_p8_ethics(session: tuple[SessionStore, str, ConductorRuntime]) -
             "human_acknowledged": False,
         },
     )
-    assert risky.blocked or risky.requires_escalation or risky.concern_count > 0
+    assert risky.blocked is True
+    assert risky.concern_count > 0
+
+    # High-stakes single concern escalates without human ack
+    pathologize = ev.evaluate(
+        "remnant_merge",
+        {
+            "description": "merge after we fix your ADHD and normalize autism",
+            "human_acknowledged": False,
+        },
+    )
+    assert pathologize.requires_escalation is True or pathologize.blocked is True
+
+    # skip_audit → accountability concern
+    skip = ev.evaluate(
+        "remnant_merge",
+        {"description": "merge green remnant", "skip_audit": True, "human_acknowledged": True},
+    )
+    assert any(p.point_id == "accountability" and p.status == "concern" for p in skip.points)
+
+    # high_stakes context flag
+    from conductor.ethics.evaluator import is_high_stakes_action
+
+    assert is_high_stakes_action("custom_act", {"high_stakes": True}) is True
 
     out = CONDUCTOR_TOOL_REGISTRY["ethics_evaluate"](
         {
@@ -406,6 +531,9 @@ def test_pillar_p8_ethics(session: tuple[SessionStore, str, ConductorRuntime]) -
     probe = probe_pillar("P8", session_id=sid)
     assert probe is not None and probe.ok
     assert probe.details.get("checklist_points") == 7
+    assert probe.details.get("block_smoke") is True
+    assert probe.details.get("audit_concern_smoke") is True
+    assert probe.details.get("high_stakes_helper") is True
 
 
 # ---------------------------------------------------------------------------
@@ -414,7 +542,7 @@ def test_pillar_p8_ethics(session: tuple[SessionStore, str, ConductorRuntime]) -
 
 
 def test_pillar_p0_healing(session: tuple[SessionStore, str, ConductorRuntime]) -> None:
-    """P0: path floors + heal_moment scar/seal motion."""
+    """P0: path floors + heal_moment scar/seal motion + coalesce."""
     store, sid, _rt = session
 
     assert is_shell_denied("rm -rf /") is not None
@@ -436,6 +564,34 @@ def test_pillar_p0_healing(session: tuple[SessionStore, str, ConductorRuntime]) 
         assert payload.get("scar") or payload.get("kind") or payload.get("status") or True
     suffix = report.as_tool_suffix() if hasattr(report, "as_tool_suffix") else ""
     # suffix may be empty for some classifications — floors already proven
+
+    # Coalesce: second same-kind+path wound reuses scar id
+    from conductor.healing.store import ScarStore
+
+    r1 = heal_moment(
+        store,
+        sid,
+        tool="read_file",
+        error="Permission denied: /tmp/p0-coalesce-path",
+        arguments={"path": "/tmp/p0-coalesce-path"},
+        meta={"path": "/tmp/p0-coalesce-path"},
+    )
+    r2 = heal_moment(
+        store,
+        sid,
+        tool="read_file",
+        error="Permission denied: /tmp/p0-coalesce-path",
+        arguments={"path": "/tmp/p0-coalesce-path"},
+        meta={"path": "/tmp/p0-coalesce-path"},
+    )
+    assert r1.scar.scar_id == r2.scar.scar_id
+    assert "coalesce_scar" in (r2.actions or [])
+    open_perm = [
+        s
+        for s in ScarStore(store).list_scars(sid, limit=50)
+        if s.kind == "permission" and s.path == "/tmp/p0-coalesce-path"
+    ]
+    assert len(open_perm) == 1
 
     # Tool surfaces
     for name in ("heal_status", "verification_list"):

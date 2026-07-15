@@ -53,20 +53,25 @@ def classify_tool_failure(
     if _PERM_RE.search(err):
         return Classification(kind="permission", severity=3, path=path, recoverability="low")
 
-    if tool == "read_file" and (_MISSING_RE.search(err) or "Error reading" in err):
+    tool_l = (tool or "").strip().lower()
+
+    if tool_l in {"read_file", "search_files"} and (
+        _MISSING_RE.search(err) or "Error reading" in err
+    ):
         return Classification(kind="path_missing", severity=2, path=path, recoverability="high")
 
-    if tool == "write_file" and _MISSING_RE.search(err):
+    if tool_l == "write_file" and _MISSING_RE.search(err):
         return Classification(kind="path_missing", severity=2, path=path, recoverability="medium")
 
-    if tool == "run_shell":
-        exit_code = meta.get("exit_code")
+    # Hermes hosts expose shell as terminal; Conductor agent uses run_shell.
+    if tool_l in {"run_shell", "terminal", "bash", "shell"}:
+        exit_code = meta.get("exit_code", meta.get("returncode"))
         if _MISSING_RE.search(err):
             return Classification(kind="path_missing", severity=2, path=path, recoverability="medium")
         if exit_code not in (None, 0) or err:
             return Classification(kind="shell", severity=2, path=path, recoverability="low")
 
-    if _CONN_RE.search(err) or tool in {"provider", "chat"}:
+    if _CONN_RE.search(err) or tool_l in {"provider", "chat"}:
         return Classification(kind="provider", severity=3, path="", recoverability="medium")
 
     if "unknown tool" in err.lower():

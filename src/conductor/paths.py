@@ -126,10 +126,64 @@ def canonical_soul_path() -> Path:
     return conductor_home() / "SOUL.md"
 
 
+def _text_looks_like_partner_soul(text: str) -> bool:
+    """True when body is Conductor partner wavelength (not a host meister SOUL)."""
+    lower = text.casefold()
+    if "enhance the host" in lower and "conductor" in lower:
+        return True
+    if "soul resonance" in lower and ("partner" in lower or "meister" in lower):
+        return True
+    if "you are the conductor" in lower or "you are **the conductor**" in lower:
+        return True
+    if "immutable core identity for the conductor" in lower:
+        return True
+    return False
+
+
 def soul_path() -> Path:
-    home_soul = conductor_home() / "SOUL.md"
-    if home_soul.exists():
-        return home_soul
+    """Runtime path to the Conductor *partner* SOUL (wavelength), never the meister.
+
+    Shared Hermes homes keep the host identity in ``SOUL.md`` and the partner in
+    ``CONDUCTOR_PARTNER_SOUL.md`` (see docs/HERMES.md, docs/SOUL_RESONANCE.md).
+    Older installs that only had partner text in ``$HOME/SOUL.md`` still work.
+
+    Resolution order:
+      1. ``CONDUCTOR_PARTNER_SOUL`` env (file path)
+      2. ``$CONDUCTOR_HOME/CONDUCTOR_PARTNER_SOUL.md``
+      3. ``$CONDUCTOR_HOME/SOUL.md`` only if partner-shaped and not the meister path
+      4. package/canonical ``SOUL.md``
+    """
+    explicit = os.environ.get("CONDUCTOR_PARTNER_SOUL", "").strip()
+    if explicit:
+        p = Path(explicit).expanduser()
+        if p.is_file():
+            return p.resolve()
+
+    home = conductor_home()
+    partner_file = home / "CONDUCTOR_PARTNER_SOUL.md"
+    if partner_file.is_file():
+        return partner_file.resolve()
+
+    home_soul = home / "SOUL.md"
+    if home_soul.is_file():
+        host_env = os.environ.get("CONDUCTOR_HOST_SOUL", "").strip()
+        if host_env:
+            try:
+                host_p = Path(host_env).expanduser()
+                if host_p.is_file() and host_p.resolve() == home_soul.resolve():
+                    # Shared-home meister file — do not treat as partner.
+                    return canonical_soul_path()
+            except OSError:
+                pass
+        try:
+            body = home_soul.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            body = ""
+        if _text_looks_like_partner_soul(body):
+            return home_soul.resolve()
+        # Host-shaped SOUL with no partner file → package partner wavelength.
+        return canonical_soul_path()
+
     return canonical_soul_path()
 
 

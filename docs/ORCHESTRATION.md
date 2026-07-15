@@ -100,6 +100,18 @@ Conductor **does not** reimplement Hermes tool-batch segmentation. It classifies
 
 Module: `conductor.core.wave_planner` — `classify_tool`, `host_parallel_safe`, `plan_waves`, `parallel_recipe_thin`, `hybrid_safe_preflight_pack`.
 
+**1.18.12+ remnant action classes + plan cap:**
+
+| `remnant_orchestrate` action | Class | Wave |
+|------------------------------|-------|------|
+| status, list, heartbeat, await, protocol, compliance | `safe_parallel` | A |
+| report, merge, merge_reflective, merge_deep, spawn_ack, terminate | `barrier` | B |
+| fanout, spawn | `spawn` | C |
+
+`plan_waves` truncates input at `MAX_WAVE_ITEMS` (default 64) and sets `summary.truncated`. Waves remain **advisory labels** — do not reimplement Hermes segmentation.
+
+Full-mode recipe adds: terminate abandoned remnants; merge with `force`/`accept_theater` only for theater/host-never-spawned paths.
+
 **1.18.10–1.18.11 failure detection:** scars only on host `status`/`error_type`, JSON truthy `error` / non-zero `exit_code`/`returncode`, or strong plain-text markers — never bare substring `error` in success dumps. JSON **arrays** do not body-scan. Status **`completed`/`done`** count as ok. After any detector ship, **restart hermes-serve** so live modules match disk.
 
 ### Constraints (Grok)

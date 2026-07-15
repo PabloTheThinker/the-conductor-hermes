@@ -84,6 +84,11 @@ class DistillationEngine:
         track_updates: list[dict[str, Any]] = []
         quarantined: list[str] = []
 
+        # Labels still present in the final workspace snapshot — persistence is evidence.
+        snapshot_keys = {
+            _normalize_label(c.label) for c in snapshot.slots if not c.automatic
+        }
+
         for key, bucket in aggregates.items():
             label = bucket["label"]
             confidences: list[float] = bucket["confidences"]
@@ -93,6 +98,13 @@ class DistillationEngine:
                 len(bucket["generations"]),
                 len(confidences),
             )
+            # High-confidence concepts that survived in the final snapshot get a
+            # support floor so rehydrate-from-slots (or single strong posts) can promote.
+            if (
+                key in snapshot_keys
+                and bucket["max_confidence"] >= self.confidence_threshold
+            ):
+                support_score = max(support_score, 2)
             candidate = DistillationCandidate(
                 label=label,
                 confidence=bucket["max_confidence"],

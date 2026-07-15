@@ -42,9 +42,27 @@ def _extract_tagline(content: str) -> str:
 
 
 def load_soul_identity(path: Path | None = None) -> SoulIdentity:
-    resolved = path or canonical_soul_path()
+    """Load partner SOUL identity for integrity /slash probes.
+
+    Prefers the runtime partner path (``soul_path`` / ``CONDUCTOR_PARTNER_SOUL``)
+    so shared Hermes homes check the partner wavelength, not the meister file.
+    """
     runtime = soul_path()
-    runtime_overridden = runtime.resolve() != resolved.resolve() and runtime.exists()
+    try:
+        canonical = canonical_soul_path()
+    except RuntimeError:
+        canonical = runtime
+    if path is not None:
+        resolved = path
+    elif runtime.is_file():
+        resolved = runtime
+    else:
+        resolved = canonical
+    runtime_overridden = (
+        runtime.is_file()
+        and canonical.is_file()
+        and runtime.resolve() != canonical.resolve()
+    )
     if not resolved.exists():
         return SoulIdentity(
             path=resolved,

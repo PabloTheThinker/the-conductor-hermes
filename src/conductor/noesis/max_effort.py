@@ -20,7 +20,7 @@ VOICES = (
 )
 
 _OWNER_RE = re.compile(
-    r"\b(owner|owned by|who)\b|\b(operator|ilo|conductor|agent)\b",
+    r"\b(owner|owned by|who)\b|\b(operator|conductor|agent|human|parent)\b",
     re.I,
 )
 _TIMELINE_RE = re.compile(r"\b(24\s*[-–]?\s*48\s*h|24h|48h|within\s+\d+\s*h|next\s+\d+\s*h)\b", re.I)
@@ -62,6 +62,7 @@ class MaxEffortResult:
     verification_method: str = ""
     action_valid: bool = True
     action_rejection: str = ""
+    forward_note: str = ""
     weighting: str = ""
     distilled: dict[str, Any] | None = None
     pocket_path: str = ""
@@ -78,6 +79,7 @@ class MaxEffortResult:
             "verification_method": self.verification_method,
             "action_valid": self.action_valid,
             "action_rejection": self.action_rejection,
+            "forward_note": self.forward_note,
             "weighting": self.weighting,
             "distilled": self.distilled,
             "pocket_path": self.pocket_path,
@@ -128,7 +130,7 @@ def build_deterministic_voices(decision: str) -> dict[str, str]:
         ),
         "Reason": (
             f"Integrate optimization vs sustainability for '{short}' against mission priorities "
-            f"(reliable systems, forward motion, exit wage dependence). Weight evidence over preference."
+            f"(reliable systems, shipping evidence, reversible risk). Weight evidence over preference."
         ),
         "Voice of Action": (
             f"Within 48h, owner=operator+conductor must take the smallest verifiable step on '{short[:40]}' "
@@ -258,7 +260,7 @@ def run_max_effort(
             f"HOLD on '{decision[:100]}': Voice of Action rejected ({reason}). "
             "Reason requires a concrete 24–48h step before commit."
         )
-        result.forward_note = reason  # type: ignore[attr-defined]
+        result.forward_note = reason
         result.next_step = ""
         result.tradeoffs.append(f"Action rejection: {reason}")
 
@@ -311,3 +313,35 @@ def run_max_effort(
         result.distilled = distilled.model_dump(mode="json")
 
     return result
+
+
+def format_max_effort_brief(result: MaxEffortResult) -> str:
+    """Human-readable Max Effort summary for tools/slash."""
+    lines = [
+        f"Decision: {result.decision}",
+        f"Action valid: {result.action_valid}",
+    ]
+    if result.action_rejection:
+        lines.append(f"Rejection: {result.action_rejection}")
+    if result.forward_note:
+        lines.append(f"Hold note: {result.forward_note}")
+    if result.next_step:
+        deadline = result.next_actions[0].deadline if result.next_actions else "?"
+        lines.append(
+            f"Next step ({result.owner}, {deadline}): {result.next_step[:200]}"
+        )
+    if result.success_criteria:
+        lines.append(f"Done when: {result.success_criteria}")
+    if result.voices:
+        lines.append("Voices:")
+        for name, text in result.voices.items():
+            lines.append(f"  • {name}: {text[:140]}")
+    if result.tradeoffs:
+        lines.append("Tradeoffs:")
+        for tr in result.tradeoffs[:4]:
+            lines.append(f"  - {tr}")
+    if result.verification_method:
+        lines.append(f"Verification: {result.verification_method}")
+    if result.pocket_path:
+        lines.append(f"Pocket: {result.pocket_path}")
+    return "\n".join(lines)

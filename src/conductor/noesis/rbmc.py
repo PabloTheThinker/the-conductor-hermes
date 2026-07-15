@@ -140,35 +140,63 @@ def run_rbmc(
 
     # --- SIMULATE ---
     posted: list[str] = []
+    obj_short = (objective or "task")[:40]
+    per_clone = max(1, int(cfg.concepts_per_clone))
     for clone_id, label, conf in branches:
-        conductor.post_concept(
-            agent_session_id,
-            label=label,
-            confidence=max(cfg.min_confidence, conf),
-            clone_id=clone_id,
-            primary_emotion="curious",
-            intensity=0.65,
-            reasoning_layer=1,
-        )
-        posted.append(label)
-        # Secondary concept per clone
-        risk_label = f"risk:{clone_id} — residual uncertainty on {(objective or 'task')[:40]}"
-        conductor.post_concept(
-            agent_session_id,
-            label=risk_label,
-            confidence=0.8,
-            clone_id=clone_id,
-            primary_emotion="tension",
-            intensity=0.55,
-            reasoning_layer=2,
-        )
-        posted.append(risk_label)
+        # Primary branch concept always first
+        to_post: list[tuple[str, float, str, float, int]] = [
+            (label, max(cfg.min_confidence, conf), "curious", 0.65, 1),
+        ]
+        if per_clone >= 2:
+            to_post.append(
+                (
+                    f"risk:{clone_id} — residual uncertainty on {obj_short}",
+                    0.8,
+                    "tension",
+                    0.55,
+                    2,
+                )
+            )
+        if per_clone >= 3:
+            to_post.append(
+                (
+                    f"tradeoff:{clone_id} — opportunity cost on {obj_short}",
+                    0.79,
+                    "focused",
+                    0.6,
+                    2,
+                )
+            )
+        # Further concepts: lightweight probes (bounded by per_clone)
+        while len(to_post) < per_clone:
+            n = len(to_post) + 1
+            to_post.append(
+                (
+                    f"probe:{clone_id}:{n} — alternate angle on {obj_short}",
+                    max(cfg.min_confidence, 0.78),
+                    "curious",
+                    0.55,
+                    2,
+                )
+            )
+        for lab, conf_v, emotion, intensity, layer in to_post[:per_clone]:
+            conductor.post_concept(
+                agent_session_id,
+                label=lab,
+                confidence=conf_v,
+                clone_id=clone_id,
+                primary_emotion=emotion,
+                intensity=intensity,
+                reasoning_layer=layer,
+            )
+            posted.append(lab)
     result.concepts_posted = posted
     result.phases.append(
         RBMCPhaseResult(
             phase="simulate",
-            detail=f"posted {len(posted)} concepts across clones",
-            artifacts={"labels": posted[:8]},
+            detail=f"posted {len(posted)} concepts across clones "
+            f"({per_clone}/clone)",
+            artifacts={"labels": posted[:8], "concepts_per_clone": per_clone},
         )
     )
 

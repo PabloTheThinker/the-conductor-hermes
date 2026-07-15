@@ -42,6 +42,43 @@ class ScarStore:
                 return s
         return None
 
+    def find_coalesce_target(
+        self,
+        session_id: str,
+        *,
+        kind: str,
+        path: str = "",
+        source_tool: str = "",
+    ) -> Scar | None:
+        """Reuse an active scar for the same wound class instead of minting UUIDs.
+
+        Preference: same kind+path → same kind+tool → most recent same kind.
+        Healed scars are not reused (a new failure after heal is a new event).
+        """
+        active = {"open", "healing", "chronic", "escalated"}
+        kind_n = (kind or "").strip()
+        if not kind_n:
+            return None
+        path_n = (path or "").strip()
+        tool_n = (source_tool or "").strip()
+        candidates = [
+            s
+            for s in self.list_scars(session_id, limit=_MAX_SCARS)
+            if s.kind == kind_n and s.status in active
+        ]
+        if not candidates:
+            return None
+        if path_n:
+            for s in candidates:
+                if (s.path or "").strip() == path_n:
+                    return s
+        if tool_n:
+            for s in candidates:
+                if (s.source_tool or "").strip() == tool_n:
+                    return s
+        # Same kind flood (false-positive or chronic): one ledger row.
+        return candidates[0]
+
     def upsert(self, scar: Scar) -> Scar:
         scar.updated_at = _utcnow()
         items = self._load(scar.session_id)

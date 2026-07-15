@@ -9,6 +9,11 @@ from conductor.memory.models import EmotionalValence, EpisodicEntry
 from conductor.session.store import SessionStore
 
 EPISODIC_META_KEY = "episodic_memory"
+# Hard cap keeps session meta JSON bounded; newest retained.
+EPISODIC_MAX_ITEMS = 2000
+
+_FAILURE_OUTCOMES = frozenset({"failure", "fail", "error", "blocked", "reject"})
+_SUCCESS_OUTCOMES = frozenset({"success", "ok", "done", "resolved"})
 
 
 class EpisodicStore:
@@ -48,6 +53,8 @@ class EpisodicStore:
         data = self._load(agent_session_id)
         items: list[Any] = list(data.get("items") or [])
         items.append(entry.model_dump(mode="json"))
+        if len(items) > EPISODIC_MAX_ITEMS:
+            items = items[-EPISODIC_MAX_ITEMS:]
         data["items"] = items
         self._save(agent_session_id, data)
         return entry
@@ -73,14 +80,53 @@ class EpisodicStore:
         *,
         tag: str | None = None,
         outcome: str | None = None,
+        content: str | None = None,
         limit: int = 50,
     ) -> list[EpisodicEntry]:
+        """Filter by tag, outcome, and/or free-text match on content/context/tags."""
         rows = self.list_entries(agent_session_id, limit=10_000)
         if tag:
-            rows = [e for e in rows if tag in e.tags]
+            rows = [e for e in rows if tag in (e.tags or [])]
         if outcome:
             rows = [e for e in rows if e.outcome == outcome]
+        if content:
+            qlow = content.strip().lower()
+            if qlow:
+                rows = [
+                    e
+                    for e in rows
+                    if qlow in (e.content or "").lower()
+                    or qlow in (e.context or "").lower()
+                    or any(qlow in str(t).lower() for t in (e.tags or []))
+                ]
         return rows[:limit]
+
+    def select_for_inject(
+        self,
+        agent_session_id: str,
+        *,
+        limit: int = 4,
+        pool: int = 40,
+    ) -> list[EpisodicEntry]:
+        """Rank recent episodes for prompt injection: failures + high valence first."""
+        rows = self.list_entries(agent_session_id, limit=pool)
+        if not rows:
+            return []
+
+        def _score(e: EpisodicEntry) -> tuple[float, float, float]:
+            outcome = (e.outcome or "").strip().lower()
+            intensity = float(e.emotional_valence.intensity or 0.0)
+            fail_boost = 2.0 if outcome in _FAILURE_OUTCOMES else 0.0
+            success_nudge = 0.35 if outcome in _SUCCESS_OUTCOMES else 0.0
+            # created_at as secondary recency (higher = newer)
+            try:
+                recency = e.created_at.timestamp()
+            except Exception:  # noqa: BLE001
+                recency = 0.0
+            return (fail_boost + intensity + success_nudge, recency, intensity)
+
+        ranked = sorted(rows, key=_score, reverse=True)
+        return ranked[:limit]
 
 
 def record_lifecycle_event(

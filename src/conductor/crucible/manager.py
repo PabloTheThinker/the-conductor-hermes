@@ -94,16 +94,20 @@ class CrucibleManager:
         workspace_snapshot: WorkspaceState,
         clones: list[CloneIdentity] | None = None,
         state: CrucibleState = CrucibleState.RUNNING,
+        events: list | None = None,
     ) -> CrucibleSession:
-        """Reattach a persisted Crucible session after process restart."""
+        """Rebuild an in-process session after process restart (from conductor meta)."""
+        if state == CrucibleState.IDLE:
+            raise ValueError("cannot rehydrate an IDLE crucible session")
         bus = WorkspaceBus(session_id=session_id, capacity=workspace_snapshot.capacity)
-        bus.restore_from_state(workspace_snapshot)
+        clone_list = list(clones or [])
+        bus.restore_from_state(workspace_snapshot, events=events, clones=clone_list)
         session = CrucibleSession(
             session_id=session_id,
             state=state,
             metadata=metadata,
             bus=bus,
-            clones=list(clones or []),
+            clones=clone_list,
         )
         self._sessions[session_id] = session
         logger.info("crucible session rehydrated", extra={"session_id": session_id})
@@ -125,7 +129,15 @@ class CrucibleManager:
     def register_clone(self, session_id: str, identity: CloneIdentity) -> CloneIdentity:
         session = self._require_session(session_id)
         session.bus.register_clone(identity)
-        session.clones.append(identity)
+        # Keep session.clones aligned with bus: one identity per clone_id.
+        existing_idx = next(
+            (i for i, c in enumerate(session.clones) if c.clone_id == identity.clone_id),
+            None,
+        )
+        if existing_idx is None:
+            session.clones.append(identity)
+        else:
+            session.clones[existing_idx] = identity
         if session.state == CrucibleState.ACTIVATING:
             session.state = CrucibleState.RUNNING
         return identity
@@ -167,9 +179,27 @@ class CrucibleManager:
             raise ValueError(f"distill_session not allowed in state {session.state.value}")
 
         session.state = CrucibleState.DISTILLING
+        snapshot = session.bus.snapshot()
+        events = session.bus.trace()
+        # After process restart without a stored audit trace, slots still carry
+        # deliberate concepts — synthesize POST events so promotion still works.
+        if not events and snapshot.slots:
+            from conductor.crucible.models import WorkspaceEvent, WorkspaceOperation
+
+            events = [
+                WorkspaceEvent(
+                    session_id=session_id,
+                    operation=WorkspaceOperation.POST,
+                    actor_clone_id=concept.source_clone_id,
+                    concept=concept,
+                    generation_after=snapshot.generation,
+                )
+                for concept in snapshot.slots
+                if not concept.automatic
+            ]
         result = self._distillation_engine.run(
-            session.bus.trace(),
-            session.bus.snapshot(),
+            events,
+            snapshot,
             governance_scope=governance_scope,
         )
         session.distillation = result

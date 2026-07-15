@@ -95,15 +95,34 @@ def handle_crucible_slash(
         if not decision:
             return "Usage: /crucible max_effort <decision>"
         payload = conductor.run_max_effort(session_id, decision=decision)
-        lines = [
-            f"Max Effort complete — {payload.get('decision', '')}",
-            f"Next step (24–48h): {payload.get('next_step', '')}",
-            f"Owner: {payload.get('owner', '')}",
-            f"Done when: {payload.get('success_criteria', '')}",
-        ]
-        if payload.get("pocket_path"):
-            lines.append(f"Pocket: {payload['pocket_path']}")
-        return "\n".join(lines)
+        from conductor.noesis.max_effort import MaxEffortResult, format_max_effort_brief
+
+        # Prefer structured brief when payload maps cleanly
+        try:
+            result = MaxEffortResult(
+                decision=str(payload.get("decision") or decision),
+                voices=dict(payload.get("voices") or {}),
+                next_step=str(payload.get("next_step") or ""),
+                owner=str(payload.get("owner") or ""),
+                success_criteria=str(payload.get("success_criteria") or ""),
+                tradeoffs=list(payload.get("tradeoffs") or []),
+                verification_method=str(payload.get("verification_method") or ""),
+                action_valid=bool(payload.get("action_valid", True)),
+                action_rejection=str(payload.get("action_rejection") or ""),
+                forward_note=str(payload.get("forward_note") or ""),
+                pocket_path=str(payload.get("pocket_path") or ""),
+            )
+            return format_max_effort_brief(result)
+        except Exception:  # noqa: BLE001
+            lines = [
+                f"Max Effort complete — {payload.get('decision', '')}",
+                f"Next step (24–48h): {payload.get('next_step', '')}",
+                f"Owner: {payload.get('owner', '')}",
+                f"Done when: {payload.get('success_criteria', '')}",
+            ]
+            if payload.get("pocket_path"):
+                lines.append(f"Pocket: {payload['pocket_path']}")
+            return "\n".join(lines)
 
     if sub == "pocket":
         from conductor.crucible.pocket import pocket_status

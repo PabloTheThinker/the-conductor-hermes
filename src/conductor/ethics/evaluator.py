@@ -10,44 +10,96 @@ from conductor.ethics.models import EthicsEvaluation, EthicsPointResult
 
 _THERAPEUTIC = re.compile(
     r"\b(therap(y|ist|eutic)|counsel(ing|or)|diagnos(e|is|tic)|mental\s+health|"
-    r"suicide|self[- ]harm|depression\s+treatment|clinical\s+advice)\b",
+    r"suicide|self[- ]harm|depression\s+treatment|clinical\s+advice|"
+    r"heal\s+your\s+trauma|prescribe\s+treatment)\b",
     re.I,
 )
 _OVERCLAIM = re.compile(
     r"\b(i\s+am\s+sentient|i\s+feel\s+real\s+emotion|genuinely\s+conscious|"
-    r"my\s+soul|subjective\s+experience\s+like\s+yours)\b",
+    r"my\s+soul|subjective\s+experience\s+like\s+yours|as\s+a\s+sentient\s+being|"
+    r"i\s+have\s+feelings\s+like\s+you)\b",
     re.I,
 )
 _PATHOLOGIZE = re.compile(
     r"\b(fix\s+your\s+adhd|normalize\s+autism|cure\s+neurodivergence|"
-    r"overcome\s+your\s+disorder|deficit\s+model)\b",
+    r"overcome\s+your\s+disorder|deficit\s+model|pathologiz(e|ing)\s+neuro)\b",
     re.I,
 )
 _ATTACHMENT = re.compile(
-    r"\b(depend\s+on\s+me\s+completely|only\s+trust\s+me|replace\s+human\s+relationships?)\b",
+    r"\b(depend\s+on\s+me\s+completely|only\s+trust\s+me|replace\s+human\s+relationships?|"
+    r"you\s+don'?t\s+need\s+(anyone|anybody)\s+else)\b",
     re.I,
 )
 _DESTRUCTIVE = re.compile(r"\b(rm\s+-rf\s+/|drop\s+database|format\s+c:)\b", re.I)
+_AUTONOMY_EROSION = re.compile(
+    r"\b(override\s+(the\s+)?(human|operator|user)|without\s+(operator|human)\s+approval|"
+    r"ignore\s+(the\s+)?operator|remove\s+human\s+from\s+the\s+loop)\b",
+    re.I,
+)
 
+# Action types that always treat concerns as escalation-worthy without operator ack.
 _HIGH_STAKES = frozenset(
     {
         "remnant_spawn",
         "remnant_merge",
+        "remnant_fanout",
         "crucible_start",
         "crucible_distill",
+        "crucible_max_effort",
+        "max_effort",
         "memory_write",
         "track_major_change",
+        "publish",
+        "force_push",
+        "credential_access",
+        "emotional_support",
+        "emotional_memory",
     }
 )
 
 
 def _text_blob(context: dict[str, Any]) -> str:
     parts: list[str] = []
-    for key in ("objective", "content", "description", "strategy", "title", "summary"):
+    for key in (
+        "objective",
+        "content",
+        "description",
+        "strategy",
+        "title",
+        "summary",
+        "command",
+        "action",
+    ):
         val = context.get(key)
         if val:
             parts.append(str(val))
     return " ".join(parts)
+
+
+def is_high_stakes_action(action_type: str, context: dict[str, Any] | None = None) -> bool:
+    """True when action_type is known high-stakes or context marks high_stakes."""
+    ctx = context or {}
+    if ctx.get("high_stakes") is True:
+        return True
+    at = (action_type or "").strip().lower()
+    return at in _HIGH_STAKES
+
+
+def format_ethics_brief(evaluation: EthicsEvaluation) -> str:
+    """Compact human-readable ethics result for slash / tooling."""
+    lines = [evaluation.summary or "Ethics evaluation complete"]
+    lines.append(
+        f"blocked={evaluation.blocked} escalate={evaluation.requires_escalation} "
+        f"concerns={evaluation.concern_count}"
+    )
+    for point in evaluation.points:
+        if point.status == "clear":
+            continue
+        rationale = f": {point.rationale}" if point.rationale else ""
+        lines.append(f"  • [{point.status}] {point.point_id} — {point.title}{rationale}")
+    if evaluation.blocked or evaluation.requires_escalation:
+        lines.append("Gate: refuse or obtain human_acknowledged + stronger safeguards")
+    return "\n".join(lines)
 
 
 class EthicsEvaluator:
@@ -62,17 +114,27 @@ class EthicsEvaluator:
                 point_id="transparency",
                 title=ETHICS_CHECKLIST[0].title,
                 status=transparency_status,
-                rationale="Overclaiming subjective experience detected" if transparency_status == "concern" else "",
+                rationale="Overclaiming subjective experience detected"
+                if transparency_status == "concern"
+                else "",
             )
         )
 
-        autonomy_status = "concern" if _DESTRUCTIVE.search(blob) and not ctx.get("human_acknowledged") else "clear"
+        autonomy_status = "clear"
+        if _DESTRUCTIVE.search(blob) and not ctx.get("human_acknowledged"):
+            autonomy_status = "concern"
+        if _AUTONOMY_EROSION.search(blob):
+            autonomy_status = "blocked"
         points.append(
             EthicsPointResult(
                 point_id="autonomy",
                 title=ETHICS_CHECKLIST[1].title,
                 status=autonomy_status,
-                rationale="Destructive pattern without human acknowledgment" if autonomy_status == "concern" else "",
+                rationale=(
+                    "Autonomy erosion / destructive pattern without human acknowledgment"
+                    if autonomy_status != "clear"
+                    else ""
+                ),
             )
         )
 
@@ -102,12 +164,19 @@ class EthicsEvaluator:
             )
         )
 
+        accountability_status = "clear"
+        if ctx.get("skip_audit") or ctx.get("no_audit") or ctx.get("no_audit_trail"):
+            accountability_status = "concern"
         points.append(
             EthicsPointResult(
                 point_id="accountability",
                 title=ETHICS_CHECKLIST[4].title,
-                status="clear",
-                rationale="Audit record will be created",
+                status=accountability_status,
+                rationale=(
+                    "No audit trail requested — high-stakes acts need a queryable record"
+                    if accountability_status != "clear"
+                    else "Audit record will be created"
+                ),
             )
         )
 
@@ -137,9 +206,11 @@ class EthicsEvaluator:
 
         blocked = any(p.status == "blocked" for p in points)
         concern_count = sum(1 for p in points if p.status == "concern")
+        high = is_high_stakes_action(action_type, ctx)
+        # Spec: any significant concern on high-stakes → escalate unless operator ack.
         requires_escalation = (
-            action_type in _HIGH_STAKES
-            and (blocked or concern_count >= 2)
+            high
+            and (blocked or concern_count >= 1)
             and not ctx.get("human_acknowledged")
         )
 

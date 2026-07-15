@@ -113,6 +113,9 @@ class ConductorRuntime:
     def list_audit_records(self, agent_session_id: str, *, limit: int = 20) -> list[AuditRecord]:
         return self._audit.list_records(agent_session_id, limit=limit)
 
+    def audit_summary(self, agent_session_id: str) -> dict[str, Any]:
+        return self._audit.summary(agent_session_id)
+
     def soul_status(self) -> dict[str, Any]:
         identity = load_soul_identity()
         out: dict[str, Any] = {
@@ -216,6 +219,16 @@ class ConductorRuntime:
         meta["state"] = session.state.value
         meta["last_snapshot"] = snapshot.model_dump(mode="json")
         meta["crucible_clones"] = [c.model_dump(mode="json") for c in session.clones]
+        # Persist capped audit trace so rehydrate → distill still has promotion evidence.
+        try:
+            from conductor.crucible.bus import TRACE_MAX_EVENTS
+
+            events = session.bus.trace()
+            meta["workspace_events"] = [
+                e.model_dump(mode="json") for e in events[-TRACE_MAX_EVENTS:]
+            ]
+        except Exception:  # noqa: BLE001
+            pass
         self.save_meta(agent_session_id, meta)
         try:
             from conductor.crucible.pocket import write_workspace_snapshot
@@ -247,6 +260,19 @@ class ConductorRuntime:
             for item in clones_raw
             if isinstance(item, dict)
         ]
+        events = None
+        events_raw = meta.get("workspace_events")
+        if isinstance(events_raw, list) and events_raw:
+            from conductor.crucible.models import WorkspaceEvent
+
+            events = []
+            for item in events_raw:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    events.append(WorkspaceEvent.model_validate(item))
+                except Exception:  # noqa: BLE001
+                    continue
         task_snap = meta.get("crucible_task_snapshot") or {}
         self._crucible.restore_session(
             str(cid),
@@ -259,6 +285,7 @@ class ConductorRuntime:
             workspace_snapshot=workspace,
             clones=clones,
             state=crucible_state,
+            events=events,
         )
         return True
 
@@ -353,6 +380,7 @@ class ConductorRuntime:
             c.model_dump(mode="json") for c in (session.clones if session else [])
         ]
         meta["last_distillation"] = None
+        meta["workspace_events"] = []
         self.save_meta(agent_session_id, meta)
         pocket_dir = ""
         isolation: dict[str, Any] = {}
@@ -615,15 +643,18 @@ class ConductorRuntime:
                 emotion_intensity=0.65,
                 tags=["crucible", "distill", "promoted"],
             )
-            # Promote into track notes when track store available
+            # Promote into track notes when track store available (append, never wipe)
             try:
                 track = self._tracks.ensure_default_track(
                     agent_session_id, objective=str(meta_pre.get("objective") or insight)
                 )
+                note = f"Crucible distill: {insight}"
+                prior = (track.conductor_notes or "").strip()
+                merged = note if not prior else (prior if note in prior else f"{prior} | {note}")
                 self._tracks.update_track(
                     agent_session_id,
                     track.track_id,
-                    conductor_notes=f"Crucible distill: {insight}",
+                    conductor_notes=merged,
                 )
             except Exception:  # noqa: BLE001
                 pass
@@ -952,6 +983,22 @@ class ConductorRuntime:
         )
         return [r.model_dump(mode="json") for r in records]
 
+    def terminate_remnant(
+        self,
+        agent_session_id: str,
+        *,
+        remnant_id: str,
+        reason: str = "",
+    ) -> dict[str, Any]:
+        """Mark a remnant TERMINATED without merging insights."""
+        return self._remnants.terminate_remnant(
+            agent_session_id,
+            remnant_id=remnant_id,
+            reason=reason,
+            load_meta=self.load_meta,
+            save_meta=self.save_meta,
+        )
+
     def merge_remnants_tier1(
         self,
         agent_session_id: str,
@@ -994,6 +1041,8 @@ class ConductorRuntime:
         *,
         remnant_ids: list[str] | None = None,
         human_acknowledged: bool = False,
+        force: bool = False,
+        accept_theater: bool = False,
     ) -> dict[str, Any]:
         """Tier-2 reflective merge for high-divergence remnants."""
         self._govern(
@@ -1004,6 +1053,8 @@ class ConductorRuntime:
         return self._remnants.merge_tier2_reflective(
             agent_session_id,
             remnant_ids=remnant_ids,
+            force=force,
+            accept_theater=accept_theater,
             load_meta=self.load_meta,
             save_meta=self.save_meta,
         )
@@ -1016,6 +1067,8 @@ class ConductorRuntime:
         objective: str = "",
         human_acknowledged: bool = False,
         run_rbmc: bool = True,
+        force: bool = False,
+        accept_theater: bool = False,
     ) -> dict[str, Any]:
         """Tier-3 deep merge: optional RBMC in Crucible, then fold evidence into merge."""
         self._govern(
@@ -1062,6 +1115,8 @@ class ConductorRuntime:
             agent_session_id,
             remnant_ids=remnant_ids,
             rbmc_result=rbmc_payload,
+            force=force,
+            accept_theater=accept_theater,
             load_meta=self.load_meta,
             save_meta=self.save_meta,
         )

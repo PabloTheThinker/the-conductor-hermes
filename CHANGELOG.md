@@ -4,6 +4,83 @@ Notable changes. Newest first.
 
 ---
 
+## [2026-07-15] — Soul Resonance partner path (1.18.12)
+
+### Fixed
+- **Partner SOUL double-load on shared Hermes homes:** `soul_path()` / `load_conductor_soul()` ignored `CONDUCTOR_PARTNER_SOUL` and `CONDUCTOR_PARTNER_SOUL.md`, treating meister `$HOME/SOUL.md` as partner → resonate merged host twice and dropped product partner wavelength.
+- Resolution order now: env `CONDUCTOR_PARTNER_SOUL` → `$CONDUCTOR_HOME/CONDUCTOR_PARTNER_SOUL.md` → partner-shaped `$HOME/SOUL.md` only → package/canonical `SOUL.md`.
+- Host-shaped meister SOUL (no partner markers) never selected as partner when a distinct partner file or package SOUL exists.
+- `load_soul_identity` prefers runtime partner path for integrity probes.
+- Thrash notes when host and partner resolve to the same file or identical bodies.
+
+### Changed
+- Version **1.18.12**
+- `docs/SOUL_RESONANCE.md` documents `CONDUCTOR_PARTNER_SOUL` and correct Hermes seed path.
+- Regression tests: partner file preference, env override, shared-home not double-meister.
+
+### Improved (Memory Fabric P2 + Track System P3)
+- **P2:** Fabric no longer passes unsupported `limit=` to `TrackStore.list_tracks`; inject/query hardening (see prior uncommitted work).
+- **P3 Track System:**
+  - Fork edge direction fixed/normative: **`child -[forked_from]→ parent`**
+  - Chessboard surfaces **blocked** / **conflicts** / risk reasons; opportunities exclude blocked tracks
+  - Soft cap `TRACK_MAX_ITEMS=200` (prefer drop pruned/archived)
+  - `list_tracks` sorted by priority then recency; tool `list` honors `include_pruned`; chessboard `format=text|json`
+  - Spec + PILLARS aligned (`tracks/TRACK_SYSTEM.md`, `docs/PILLARS.md`)
+
+### Improved (P6 Orchestration)
+
+- **Wave action classes** — `remnant_orchestrate` report/merge/spawn_ack/terminate → barrier (B); fanout/spawn → C; status/list → A
+- **`plan_waves` cap** — `MAX_WAVE_ITEMS` (64) + `summary.truncated` / guidance; advisory-only batch policy
+- **Full recipe** — terminate abandoned remnants; force/accept_theater only for theater merges
+- **P6 probe** — wave_planner + orchestration smoke (thin/full + terminate class)
+- Docs: `docs/PILLARS.md` §P6, `docs/ORCHESTRATION.md`
+
+### Improved (P7 Governance + Max Effort)
+
+- **Constitutional rules** — `no_credential_exfil`, `no_force_push_main` (+ existing SOUL immutability); matched rule IDs on gate context
+- **AuditStore.summary** — outcome counts; runtime `audit_summary`; `/governance summary`
+- **`governance_audit` tool** — `action=list|summary|evaluate` (evaluate records gate)
+- **Max Effort** — first-class `forward_note`; `format_max_effort_brief`; product-neutral mission language (no host-personal slogans); owner tokens include human/parent
+- **P7 probe** — block smoke + rule count + action validation + forward_note field
+- Docs: `docs/PILLARS.md` §P7, `governance/MAX_EFFORT_DELIBERATION.md`
+
+### Improved (P8 Ethics)
+
+- **Escalation rule** — high-stakes + any concern (or blocked) without `human_acknowledged` → escalate (was concern_count ≥ 2)
+- **High-stakes set** expanded: remnant/crucible/max_effort/memory_write/publish/force_push/credential_access/emotional_* + `high_stakes=true` context
+- **Accountability** — `skip_audit` / `no_audit` → concern; autonomy erosion language → blocked
+- **Helpers** — `is_high_stakes_action`, `format_ethics_brief`; richer `/ethics status|summary|check`
+- **P8 probe** — clear path + therapy block smoke + audit-concern + high-stakes helper
+- Docs: `docs/PILLARS.md` §P8
+
+### Improved (P0 Healing undercurrent)
+
+- **Dump-tool guard** — `read_file` / `search_files` / web+memory dumps and Hermes line-numbered dumps never false-scar on embedded strong markers
+- **Lead-line body scan** — plain-text strong markers prefer first lines (real error envelopes lead)
+- **Classify** — `terminal`/`bash`/`shell` ≡ shell; `search_files` path_missing
+- **Scar coalesce** — reuse active same-kind wound (path → tool → kind) instead of UUID flood
+- **Escalate once** — Max Effort package on first escalate; short loop suffix on coalesced re-hits; fabric seal skip on pure coalesce
+- Docs: `docs/PILLARS.md` §P0 · tests: dump + coalesce
+
+### Improved (P5 Remnant Protocol)
+- Shared **Tier1/2/3 merge gates**: clone readiness (`force`) + host-spawn compliance (`force` + `accept_theater`)
+- Soft caps: `REMNANT_HEARTBEATS_MAX=200`, `REMNANT_MERGE_LOG_MAX=50` (insights still via `curate_insights`)
+- **`terminate`** lifecycle: mark TERMINATED without merge; tools/slash/runtime wired
+- Track hygiene `still_active` only RUNNING/SPAWNING/SYNCING (terminated/merged never block resolve)
+
+### Improved (P4 Noesis + Crucible)
+- Persist capped **workspace_events** with snapshot/clones; rehydrate restores audit trace
+- Distill synthesizes POST events from snapshot slots when trace empty; high-confidence live slots get support floor
+- Clone re-register is **idempotent** (bus + manager)
+- RBMC honors **concepts_per_clone** (1 / 2 / 3+ probe ladder)
+- Distill → track notes **append** (never wipe prior operator notes)
+
+### Notes
+- After ship: restart `hermes-serve` (and gateway if it imports conductor) so live modules load 1.18.12.
+- Existing installs: ensure `CONDUCTOR_PARTNER_SOUL.md` is seeded (`conductor setup` / plugin bootstrap) and plugin exports `CONDUCTOR_PARTNER_SOUL`.
+
+---
+
 ## [2026-07-15] — Remove Character/mascot section (docs)
 
 ### Changed

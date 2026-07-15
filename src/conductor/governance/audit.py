@@ -52,3 +52,25 @@ class AuditStore:
         items = data.get("items") or []
         records = [AuditRecord.model_validate(item) for item in items if isinstance(item, dict)]
         return list(reversed(records[-limit:]))
+
+    def summary(self, agent_session_id: str) -> dict[str, Any]:
+        """Counts by outcome for recent audit trail (last 100)."""
+        data = self._load(agent_session_id)
+        items = data.get("items") or []
+        counts: dict[str, int] = {
+            "allowed": 0,
+            "blocked": 0,
+            "escalated": 0,
+            "other": 0,
+            "total": 0,
+        }
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            counts["total"] += 1
+            outcome = str(item.get("outcome") or "other")
+            if outcome in ("allowed", "blocked", "escalated"):
+                counts[outcome] += 1
+            else:
+                counts["other"] += 1
+        return counts

@@ -78,6 +78,11 @@ def soul_mode_from_env() -> SoulMode:
 
 
 def load_conductor_soul() -> tuple[str, Path | None]:
+    """Load partner wavelength text.
+
+    Uses :func:`conductor.paths.soul_path` (honors ``CONDUCTOR_PARTNER_SOUL`` and
+    ``CONDUCTOR_PARTNER_SOUL.md``). Never intentionally returns meister SOUL.
+    """
     path = soul_path()
     if path.is_file():
         try:
@@ -322,6 +327,26 @@ def resonate(
         c_path = c_path  # keep path metadata if any
 
     identity_block, notes = build_resonance_block(host, c_text, mode=resolved_mode)
+    # Dual-ego thrash: same path or near-identical bodies mean partner resolution failed.
+    if (
+        host
+        and host.path
+        and c_path
+        and host.path.resolve() == c_path.resolve()
+    ):
+        notes.append(
+            "thrash: host and partner resolve to the same file — set "
+            "CONDUCTOR_PARTNER_SOUL or seed CONDUCTOR_PARTNER_SOUL.md"
+        )
+    elif (
+        host
+        and host.content.strip()
+        and c_text.strip()
+        and host.content.strip() == c_text.strip()
+    ):
+        notes.append(
+            "thrash: host and partner bodies are identical — partner SOUL is not distinct"
+        )
     resonant = bool(
         resolved_mode == "resonate"
         and host

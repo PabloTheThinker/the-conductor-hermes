@@ -13,6 +13,10 @@ from conductor.crucible.models import (
 )
 
 
+# Cap persisted audit trace so rehydrate stays bounded.
+TRACE_MAX_EVENTS = 500
+
+
 class WorkspaceBus:
     def __init__(self, session_id: str, capacity: int = 32) -> None:
         self.session_id = session_id
@@ -24,7 +28,26 @@ class WorkspaceBus:
         self._trace: list[WorkspaceEvent] = []
         self._automatic_trace: list[WorkspaceConcept] = []
 
+    def _append_trace(self, event: WorkspaceEvent) -> None:
+        self._trace.append(event)
+        if len(self._trace) > TRACE_MAX_EVENTS:
+            self._trace = self._trace[-TRACE_MAX_EVENTS:]
+
     def register_clone(self, identity: CloneIdentity) -> WorkspaceEvent:
+        """Register a clone; re-register of the same clone_id is a no-op event."""
+        existing = next((c for c in self._clones if c.clone_id == identity.clone_id), None)
+        if existing is not None:
+            # Keep active list honest; do not duplicate clone identity records.
+            if identity.clone_id not in self._active_clone_ids:
+                self._active_clone_ids.append(identity.clone_id)
+            event = WorkspaceEvent(
+                session_id=self.session_id,
+                operation=WorkspaceOperation.CLONE_REGISTER,
+                actor_clone_id=identity.clone_id,
+                generation_after=self._generation,
+            )
+            self._append_trace(event)
+            return event
         if identity.clone_id not in self._active_clone_ids:
             self._active_clone_ids.append(identity.clone_id)
         self._clones.append(identity)
@@ -35,7 +58,7 @@ class WorkspaceBus:
             actor_clone_id=identity.clone_id,
             generation_after=self._generation,
         )
-        self._trace.append(event)
+        self._append_trace(event)
         return event
 
     def post(
@@ -57,7 +80,7 @@ class WorkspaceBus:
                 concept=concept,
                 generation_after=self._generation,
             )
-            self._trace.append(event)
+            self._append_trace(event)
             return event
 
         evicted_labels: list[str] = []
@@ -79,7 +102,7 @@ class WorkspaceBus:
                     concept=concept,
                     generation_after=self._generation,
                 )
-                self._trace.append(event)
+                self._append_trace(event)
                 return event
         else:
             while len(self._slots) >= self.capacity:
@@ -99,10 +122,10 @@ class WorkspaceBus:
             evicted_labels=evicted_labels,
             generation_after=self._generation,
         )
-        self._trace.append(event)
+        self._append_trace(event)
 
         for label in evicted_labels:
-            self._trace.append(
+            self._append_trace(
                 WorkspaceEvent(
                     session_id=self.session_id,
                     operation=WorkspaceOperation.EVICT,
@@ -148,7 +171,7 @@ class WorkspaceBus:
             evicted_labels=[old_label] if existing_idx is not None else [],
             generation_after=self._generation,
         )
-        self._trace.append(event)
+        self._append_trace(event)
         return event
 
     def read(self, clone_id: str) -> WorkspaceState:
@@ -159,15 +182,25 @@ class WorkspaceBus:
             actor_clone_id=clone_id,
             generation_after=self._generation,
         )
-        self._trace.append(event)
+        self._append_trace(event)
         return state
 
-    def restore_from_state(self, state: WorkspaceState) -> None:
-        """Rebuild in-memory slots from a persisted workspace snapshot."""
+    def restore_from_state(
+        self,
+        state: WorkspaceState,
+        *,
+        events: list[WorkspaceEvent] | None = None,
+        clones: list[CloneIdentity] | None = None,
+    ) -> None:
+        """Rebuild in-memory slots (and optional audit trace) from persistence."""
         self.capacity = state.capacity
         self._generation = state.generation
         self._slots = [concept.model_copy(deep=True) for concept in state.slots]
         self._active_clone_ids = list(state.active_clone_ids)
+        if clones is not None:
+            self._clones = [c.model_copy(deep=True) for c in clones]
+        if events is not None:
+            self._trace = [e.model_copy(deep=True) for e in events[-TRACE_MAX_EVENTS:]]
 
     def snapshot(self) -> WorkspaceState:
         ordered = sorted(self._slots, key=lambda c: c.salience, reverse=True)
@@ -193,5 +226,5 @@ class WorkspaceBus:
             operation=WorkspaceOperation.CLEAR,
             generation_after=self._generation,
         )
-        self._trace.append(event)
+        self._append_trace(event)
         return event

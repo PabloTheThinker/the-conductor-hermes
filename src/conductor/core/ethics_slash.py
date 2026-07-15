@@ -19,29 +19,40 @@ def handle_ethics_slash(store: SessionStore, session_id: str, args: list[str]) -
             lines.append(f"  {point.point_id}: {point.title}")
         lines.append("")
         lines.append("Usage: /ethics check <action_type> <description>")
-        lines.append("       /ethics audit")
+        lines.append("       /ethics audit | summary | list | status")
         return "\n".join(lines)
 
     sub = args[0].lower()
     rest = args[1:]
+
+    if sub in {"status", "points"}:
+        lines = ["Ethics Decision Checklist (7 points):"]
+        for i, point in enumerate(ETHICS_CHECKLIST, 1):
+            lines.append(f"  {i}. {point.point_id}: {point.title}")
+            lines.append(f"     {point.question}")
+        lines.append("High-stakes: remnant/crucible/memory_write/max_effort/publish + high_stakes=true")
+        lines.append("Decision rule: any blocked → refuse; high-stakes concern → escalate or human_ack")
+        return "\n".join(lines)
 
     if sub == "check":
         if len(rest) < 2:
             return "Usage: /ethics check <action_type> <description>"
         action_type = rest[0]
         description = " ".join(rest[1:])
-        gate = conductor.evaluate_governance(action_type, {"description": description})
+        context = {"description": description}
+        gate = conductor.evaluate_governance(action_type, context)
         conductor.record_governance_gate(
             session_id,
             action_type=action_type,
-            context={"description": description},
+            context=context,
             gate=gate,
         )
-        evaluation = gate.ethics or evaluator.evaluate(action_type, {"description": description})
-        lines = [gate.summary]
-        for point in evaluation.points:
-            if point.status != "clear":
-                lines.append(f"  • [{point.status}] {point.title}: {point.rationale}")
+        evaluation = gate.ethics or evaluator.evaluate(action_type, context)
+        from conductor.ethics.evaluator import format_ethics_brief
+
+        lines = [format_ethics_brief(evaluation)]
+        if gate.tier == "constitutional":
+            lines.insert(0, f"Constitutional gate: {gate.summary}")
         return "\n".join(lines)
 
     if sub == "audit":
@@ -55,13 +66,16 @@ def handle_ethics_slash(store: SessionStore, session_id: str, args: list[str]) -
             )
         return "\n".join(lines)
 
+    if sub in {"summary", "stats"}:
+        return conductor.format_json(conductor.audit_summary(session_id))
+
     if sub == "list":
         lines = ["Ethics checklist:"]
         for point in ETHICS_CHECKLIST:
             lines.append(f"  {point.point_id}: {point.question}")
         return "\n".join(lines)
 
-    return "Usage: /ethics [check|audit|list]"
+    return "Usage: /ethics [check|audit|summary|list|status]"
 
 
 def handle_soul_slash(_store: SessionStore, _session_id: str, args: list[str]) -> str:

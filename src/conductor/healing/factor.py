@@ -49,19 +49,41 @@ def heal_moment(
     meta = dict(meta or {})
     clf = classify_tool_failure(tool, error, arguments=args, meta=meta)
 
-    scar = Scar.open_new(
-        session_id=session_id,
+    path_hint = clf.path or str(args.get("path") or meta.get("path") or "")
+    scar_store = ScarStore(store)
+    existing = scar_store.find_coalesce_target(
+        session_id,
         kind=clf.kind,
-        severity=clf.severity,
-        summary=f"{tool} failed: {(error or 'unknown error')[:240]}",
+        path=path_hint,
         source_tool=tool,
-        error=error,
-        path=clf.path or str(args.get("path") or meta.get("path") or ""),
     )
-    scar.status = "healing"
-    scar.tier = "field"
     actions: list[str] = []
     healed = False
+    coalesce_hit = existing is not None
+    if existing is not None:
+        scar = existing
+        scar.severity = max(scar.severity, clf.severity)
+        scar.summary = f"{tool} failed: {(error or 'unknown error')[:240]}"
+        scar.source_tool = tool or scar.source_tool
+        scar.error = (error or scar.error)[:2000]
+        if path_hint:
+            scar.path = path_hint
+        # Re-open healed-like motion only if still active; keep escalated/chronic.
+        if scar.status in {"open", "healing"}:
+            scar.status = "healing"
+        actions.append("coalesce_scar")
+    else:
+        scar = Scar.open_new(
+            session_id=session_id,
+            kind=clf.kind,
+            severity=clf.severity,
+            summary=f"{tool} failed: {(error or 'unknown error')[:240]}",
+            source_tool=tool,
+            error=error,
+            path=path_hint,
+        )
+        scar.status = "healing"
+        scar.tier = "field"
 
     # --- field repairs by kind ---
     if clf.kind == "path_missing" and scar.path:
@@ -197,7 +219,9 @@ def heal_moment(
         scar.tier = "deep"
 
     ScarStore(store).upsert(scar)
-    record_scar_learning(store, scar, healed=healed)
+    # Coalesced re-hits: do not re-write Memory Fabric seals every tool call.
+    if not coalesce_hit or healed:
+        record_scar_learning(store, scar, healed=healed)
 
     # Loop engineering: stop / escalate when chronic or spine-hold
     loop_suffix = ""
@@ -209,24 +233,36 @@ def heal_moment(
             actions.append(f"loop_{decision.action}")
             if decision.action == "escalate" and scar.status not in {"healed"}:
                 scar.tier = "deep"
+                prior_status = scar.status
                 if scar.status == "open":
                     scar.status = "chronic"
                 ScarStore(store).upsert(scar)
-                # Real escalate path: structured Max Effort package (not just a hint)
-                try:
-                    from conductor.escalate_path import (
-                        build_escalate_package,
-                        escalate_package_suffix,
-                    )
-
-                    pkg = build_escalate_package(store, session_id, decision, scar=scar)
-                    loop_suffix = loop_decision_suffix(decision) + escalate_package_suffix(pkg)
-                    scar.forward_step = str(pkg.get("forward_step") or decision.escalate_hint or scar.forward_step)
-                    ScarStore(store).upsert(scar)
-                except Exception:  # noqa: BLE001
+                # Full Max Effort package once per wound class; re-hits stay short.
+                already_packaged = (
+                    prior_status in {"escalated", "chronic"}
+                    and "max effort" in (scar.forward_step or "").lower()
+                ) or (coalesce_hit and prior_status in {"escalated", "chronic"})
+                if already_packaged:
                     loop_suffix = loop_decision_suffix(decision)
-                    if decision.escalate_hint and not healed:
-                        scar.forward_step = decision.escalate_hint
+                else:
+                    try:
+                        from conductor.escalate_path import (
+                            build_escalate_package,
+                            escalate_package_suffix,
+                        )
+
+                        pkg = build_escalate_package(store, session_id, decision, scar=scar)
+                        loop_suffix = loop_decision_suffix(decision) + escalate_package_suffix(pkg)
+                        scar.forward_step = str(
+                            pkg.get("forward_step") or decision.escalate_hint or scar.forward_step
+                        )
+                        if scar.status not in {"escalated", "chronic"}:
+                            scar.status = "escalated"
+                        ScarStore(store).upsert(scar)
+                    except Exception:  # noqa: BLE001
+                        loop_suffix = loop_decision_suffix(decision)
+                        if decision.escalate_hint and not healed:
+                            scar.forward_step = decision.escalate_hint
             else:
                 loop_suffix = loop_decision_suffix(decision)
                 if decision.escalate_hint and not healed:

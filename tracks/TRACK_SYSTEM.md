@@ -96,13 +96,15 @@ We use a **hybrid persistence layer**:
   "id": "uuid",
   "from_track_id": "uuid",
   "to_track_id": "uuid",
-  "relation": "leads_to | conflicts_with | compounds_with | inspired_by | blocks | extends",
+  "relation": "leads_to | conflicts_with | compounds_with | inspired_by | blocks | extends | forked_from",
   "strength": 0.91,
   "reason": "Explanation of relationship",
   "created_at": "...",
   "discovered_in_crucible": "crucible_session_id | null"
 }
 ```
+
+**Fork edge direction (normative):** `child -[forked_from]→ parent` — the child was forked from the parent.
 
 #### `TrackEvent` (Immutable Audit Log)
 
@@ -154,10 +156,12 @@ Lightweight export used when entering The Crucible:
 
 ### 4.5 Conductor View (“Chessboard”)
 - Special query that surfaces:
-  - Top N active tracks by priority × confidence
-  - Critical conflicts or risks
-  - Tracks ready for delegation to worker agents
-  - Tracks that need human escalation (rare)
+  - Top N active tracks by priority (then recency)
+  - Risks: high priority + low confidence, **or** actively blocked (`blocks` edges)
+  - Opportunities: high priority + high confidence and not blocked
+  - Explicit **blocked** and **conflicts** sections (`blocks` / `conflicts_with`)
+  - Recent graph edges for orientation
+  - Optional human text format (`chessboard` + `format=text`)
 
 ### 4.6 Perfect Recall
 - Every track change creates an immutable `TrackEvent`
@@ -182,10 +186,11 @@ Lightweight export used when entering The Crucible:
 
 ## 6. Implementation Phases (Recommended)
 
-**Phase 1** (Current)
-- Define schema + in-memory + SQLite prototype
-- Basic CRUD + simple graph queries
-- Integration hooks in SOUL prompt
+**Phase 1** (Current — live in package)
+- Pydantic models + `TrackStore` on session meta (JSON graph: items + edges)
+- CRUD + graph: link/unlink/neighbors + soft item cap
+- Chessboard with blocked/conflicts/risk reasons; tool `track_orchestrate`
+- Spec hybrid SQLite/vector/Neo4j remains future phases
 
 **Phase 2**
 - Vector embeddings + semantic search over tracks

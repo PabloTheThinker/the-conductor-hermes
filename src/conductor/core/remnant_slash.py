@@ -126,16 +126,26 @@ def handle_remnant_slash(
             f"Notes: {payload.get('governance_notes', '')}"
         )
 
+    if sub == "terminate":
+        if not rest:
+            return "Usage: /remnant terminate <remnant_id> [reason]"
+        remnant_id = rest[0]
+        reason = " ".join(rest[1:]).strip()
+        payload = conductor.terminate_remnant(session_id, remnant_id=remnant_id, reason=reason)
+        rid = str(payload.get("remnant_id", remnant_id))
+        return f"Remnant terminated: {rid[:8]} ({rid}) status={payload.get('status')}"
+
     if sub == "status":
         return conductor.format_json(conductor.status(session_id))
 
     return (
-        "Usage: /remnant [spawn|fanout|heartbeat|merge|merge_reflective|merge_deep|status]\n"
+        "Usage: /remnant [spawn|fanout|heartbeat|merge|merge_reflective|merge_deep|terminate|status]\n"
         "  /remnant spawn <objective>\n"
         "  /remnant fanout <obj1> || <obj2>\n"
         "  /remnant heartbeat <id> <subtask> [progress%]\n"
         "  /remnant merge [remnant_id ...]           — tier1, auto-escalates on divergence\n"
         "  /remnant merge_reflective [remnant_id …]  — tier2 high-divergence\n"
         "  /remnant merge_deep [remnant_id …]         — tier3 + RBMC/Crucible\n"
+        "  /remnant terminate <id> [reason]          — mark TERMINATED without merge\n"
         "  /remnant status"
     )

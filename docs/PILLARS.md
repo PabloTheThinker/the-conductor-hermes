@@ -36,20 +36,23 @@ Each pillar is a capability layer that upgrades the host meister — not a secon
 ### P2 — Memory Fabric
 | Layer | Store | Use |
 |-------|--------|-----|
-| Episodic | `EpisodicStore` | Events + emotion + outcome |
-| Semantic | `SemanticStore` | Distilled notes / session seals |
+| Episodic | `EpisodicStore` | Events + emotion + outcome (cap `EPISODIC_MAX_ITEMS`) |
+| Semantic | `SemanticStore` | Distilled notes / session seals (casefold dedupe) |
 | Procedural | `ProceduralStore` + skills pack | Learned how-to recipes + `/plan` etc. |
-| Track-linked | tracks + tags | Strategy memory |
+| Track-linked | tracks + tags | Strategy memory (surfaced in fabric status) |
 
-Facade: `MemoryFabric` · tool actions: `fabric`, `semantic_add`, `procedure_add`, `procedure_list`  
-Live inject: `context_inject` via hooks `pre_llm_call`.
+Facade: `MemoryFabric` · tool actions: `fabric`, `search`, `semantic_add`, `procedure_add`, `procedure_list`  
+Live inject: `context_inject` via hooks `pre_llm_call` — scars → seals → **valence-ranked** episodes → procedural cues.  
+`EpisodicStore.select_for_inject` prefers failures + high intensity; `query(content=…)` powers tool search.
 
 ### P3 — Track System
-- `TrackStore`: create, list, update, fork, prune, resolve, chessboard
+- `TrackStore`: create, list (priority-sorted), update, fork, prune, resolve, chessboard
 - **Graph edges:** `link` / `unlink` / `edges` / `neighbors` (`TrackEdge`)
-- Fork auto-creates `forked_from` edge
+- Fork auto-creates **`child -[forked_from]→ parent`** edge
+- Chessboard: active / risks (incl. blocked) / opportunities / blocked / conflicts / edges; `format=text` for human view
+- Soft cap `TRACK_MAX_ITEMS=200` (drop pruned/archived first)
 - Relations: leads_to, conflicts_with, compounds_with, inspired_by, blocks, extends, forked_from
-- Spec: `tracks/TRACK_SYSTEM.md`
+- Live store: session meta graph (`SessionStore`); architecture vision: `tracks/TRACK_SYSTEM.md`
 
 ### P4 — Noesis + Crucible
 - Lifecycle: IDLE → ACTIVATING → RUNNING → DISTILLING → IDLE
@@ -57,30 +60,52 @@ Live inject: `context_inject` via hooks `pre_llm_call`.
 - Pocket: filesystem always; Docker if available
 - **RBMC** Select→Fork→Simulate→Reflect→Compound→Distill→**Backprop** (tracks + memory) + pocket trace
 - Max Effort entrypoints under `noesis/`
+- **Persistence:** `last_snapshot` + capped `workspace_events` + clones survive process restart (`_rehydrate_crucible`); distill falls back to snapshot slots if audit trace empty
+- **Clones:** re-register of same `clone_id` is idempotent (bus + session)
+- **RBMC:** `concepts_per_clone` honored (1 primary · 2 +risk · 3 +tradeoff · N probes)
+- **Distill:** high-confidence concepts still in final snapshot get support floor; track notes **append** (no wipe)
 
 ### P5 — Remnant Protocol
 - Spawn → heartbeat → merge (**Fast / Reflective / Deep**)
 - **Tier 3** `merge_deep`: runs RBMC then folds Crucible evidence into merge
 - Task-scoped snapshots; merge ledger on session meta
 - Advisory skill: `remnant-guide` (Combo C)
+- Soft caps: `REMNANT_HEARTBEATS_MAX` (200), `REMNANT_MERGE_LOG_MAX` (50); insights curated via `curate_insights`.
+- Shared merge gates on Tier1/2/3: clone readiness (`force`) + host-spawn compliance (`force` + `accept_theater`).
+- Lifecycle: `terminate` marks TERMINATED without merge; inactive statuses (including TERMINATED/MERGED) excluded from `still_active` track hygiene.
 
 ### P6 — Orchestration
 - ConductorRuntime binds Crucible + Remnants + Tracks + Memory + gates
 - Combos A–H choose pillar stacks
 - Module API for any host: `conductor.harness`
+- Thin vs full policy (`classify_orchestration`) + host spawn contracts
+- Wave planner (advisory A/B/C labels only — **not** a second Hermes scheduler):
+  - `remnant_orchestrate` action classes: reads→A, report/merge/terminate→B, fanout/spawn→C
+  - `plan_waves` capped at `MAX_WAVE_ITEMS` (64)
+- Full recipe: report → merge (force only for theater) → terminate abandoned → memory
 
 ### P7 — Governance + Max Effort
 - PolicyEngine: constitutional → ethics → allow
-- AuditStore records gates
-- Max Effort: deterministic four voices + 24–48h action
+- Constitutional rules include SOUL immutability, credential exfil, force-push main
+- AuditStore records gates + `audit_summary` counts; tool `governance_audit` supports list|summary|evaluate
+- Max Effort: deterministic four voices + 24–48h action; `forward_note` on holds; product-neutral mission language
+- Slash: `/governance status|audit|summary|check` · `/crucible max_effort`
 
 ### P8 — Ethics
-- 7-point checklist (`ETHICS_CHECKLIST.md`)
-- Blocks therapeutic/attachment overclaim; escalates high-stakes
+- 7-point checklist (`ETHICS_CHECKLIST.md` + `conductor.ethics.checklist`)
+- Blocks therapeutic/attachment/domain overclaim; pathologizing → concern; autonomy erosion → blocked
+- High-stakes (remnant/crucible/max_effort/memory_write/publish/… or `high_stakes=true`): any concern without `human_acknowledged` → escalate
+- Accountability: `skip_audit` raises concern; gates leave audit trail via governance
+- Tool `ethics_evaluate` · slash `/ethics check|audit|summary|list|status` · probe smokes block + audit-concern
 
 ### P0 — Healing undercurrent
 - Path-safety floors, thrash guard, scars/seals, recovery imprints
 - Always on when hooks/spine loaded
+- **Failure detect** (`hermes_bridge.tool_result_looks_failed`): host `status`/`error_type` win; JSON fails only on truthy `error` / non-zero `exit_code|returncode`; **dump tools** (`read_file`, `search_files`, web/search/memory dumps, …) and line-numbered file dumps **never body-scan** (source fixtures embed `permission denied` etc.)
+- **Classify** — Hermes `terminal`/`bash`/`shell` same as `run_shell`; `search_files` path_missing with `read_file`
+- **Scar coalesce** — `ScarStore.find_coalesce_target`: same kind+path → kind+tool → most recent same kind (no UUID flood on chronic/false positives)
+- **Escalate once** — full Max Effort package on first escalate; coalesced re-hits keep short loop suffix only; fabric seals skip on pure coalesce re-hits
+- Tools: `heal_status`, `heal_attempt`, `verification_list` · slash `/heal …`
 
 ---
 

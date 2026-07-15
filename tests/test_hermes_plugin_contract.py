@@ -49,7 +49,7 @@ def test_plugin_yaml_exists() -> None:
     assert "transform_tool_result" in text
     assert "api_request_error" in text
     assert "version:" in text
-    assert "1.18.11" in text
+    assert "1.18.12" in text
 
 
 def test_register_skips_hermes_core_names(

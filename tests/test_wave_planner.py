@@ -161,3 +161,29 @@ def test_bench_serial_vs_batch_shape():
     assert batch_turns < serial_turns
     assert remnant_spawns == 1
     assert mixed["batch_policy"]["prefer_single_host_batch"] is True
+
+
+def test_remnant_action_classes_and_plan_cap():
+    """P6: action-aware remnant classes + plan_waves MAX_WAVE_ITEMS."""
+    from conductor.core.wave_planner import MAX_WAVE_ITEMS
+
+    assert classify_tool("remnant_orchestrate", {"action": "list"}) == "safe_parallel"
+    assert classify_tool("remnant_orchestrate", {"action": "fanout"}) == "spawn"
+    assert classify_tool("remnant_orchestrate", {"action": "spawn"}) == "spawn"
+    for action in ("report", "merge", "merge_reflective", "merge_deep", "spawn_ack", "terminate"):
+        assert classify_tool("remnant_orchestrate", {"action": action}) == "barrier", action
+
+    # Cap: huge list truncated
+    items = [{"tool": "read_file", "arguments": {"path": f"f{i}"}} for i in range(MAX_WAVE_ITEMS + 20)]
+    plan = plan_waves(items)
+    assert plan["summary"]["truncated"] is True
+    assert plan["summary"]["total"] == MAX_WAVE_ITEMS
+    assert plan["summary"]["input_count"] == MAX_WAVE_ITEMS + 20
+    assert "truncated" in plan["guidance"].lower() or "MAX_WAVE_ITEMS" in plan["guidance"]
+    assert plan["batch_policy"].get("advisory_only") is True
+
+    # Custom max_items
+    small = plan_waves(items, max_items=5)
+    assert small["summary"]["total"] == 5
+    assert small["summary"]["truncated"] is True
+
