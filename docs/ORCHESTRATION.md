@@ -86,19 +86,21 @@ remnant_orchestrate action=merge
 | Claude | `Task` | `description`, `prompt` |
 | Hermes/ILO | `delegate_task` | `goal`, `context` (prefer one-shot `hermes_batch.tasks[]`) |
 
-### Tool classes + waves (1.18.9)
+### Tool classes + waves (1.18.9 → 1.18.10)
 
 Conductor **does not** reimplement Hermes tool-batch segmentation. It classifies tools and labels **waves** so parents emit better batches:
 
 | Wave | Class | Examples | Rule |
 |------|--------|----------|------|
-| **A** | `safe_parallel` | `read_file`, `search_files`, `web_search`, `conductor_status`, `pillar_status` (reads) | Fire together |
+| **A** | `safe_parallel` | `read_file`, `search_files`, `web_search`, `web_extract`, `session_search`, `skill_view`, status/doctor probes | Fire together (`HOST_PARALLEL_SAFE` / `host_parallel_safe()`) |
 | **B** | `barrier` | `write_file`, `patch`, `terminal`, `memory`, `track_orchestrate` | Host may serial-segment; do **not** serialize the whole turn because one write exists |
 | **C** | `spawn` | `delegate_task`, `spawn_subagent`, `remnant_orchestrate` (mutate), `hermes_batch` | Prefer **one** batch tool (`hermes_batch` / `delegate_task(tasks=[…])`) |
 
 **Prefer one large mixed host batch.** Host owns scheduling. Wave fields on fanout / `hermes_batch` are advisory (`waves.A|B|C`, `batch_id` for thrash).
 
-Module: `conductor.core.wave_planner` — `classify_tool`, `plan_waves`, `parallel_recipe_thin`, `hybrid_safe_preflight_pack`.
+Module: `conductor.core.wave_planner` — `classify_tool`, `host_parallel_safe`, `plan_waves`, `parallel_recipe_thin`, `hybrid_safe_preflight_pack`.
+
+**1.18.10 failure detection:** scars only on host `status`/`error_type`, JSON truthy `error` / non-zero `exit_code`, or strong plain-text markers — never bare substring `error` in success dumps.
 
 ### Constraints (Grok)
 

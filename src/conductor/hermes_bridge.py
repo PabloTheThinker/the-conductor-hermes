@@ -322,36 +322,166 @@ def pre_tool_call_hook(
     return None
 
 
+# Strong plain-text failure markers only. Bare substrings like "error" /
+# "failed" / "errno" are NOT sufficient — successful code dumps and symbol
+# inventories contain those words and used to poison the integrity cascade.
+_STRONG_FAIL_RES: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^error executing\b", re.I | re.M),
+    re.compile(r"traceback \(most recent call last\)", re.I),
+    re.compile(r"\[tool_error\]", re.I),
+    re.compile(r"conductor spine blocked", re.I),
+    re.compile(r"denied by path.?safety", re.I),
+    re.compile(r"\bpermission denied\b", re.I),
+    re.compile(r"\bno such file or directory\b", re.I),
+    re.compile(r"\bcommand not found\b", re.I),
+    re.compile(r"exit code[:\s]+[1-9]\d*\b", re.I),
+    re.compile(r"\bexit_code[\"'\s:=]+[1-9]\d*\b", re.I),
+    re.compile(r"\bconnection refused\b", re.I),
+    re.compile(r"\btimed out\b", re.I),
+    re.compile(r"\brate.?limit(?:ed)?\b", re.I),
+    re.compile(r"\b(?:http\s*)?status(?:\s*code)?[:\s]+(?:401|403|404|429|5\d\d)\b", re.I),
+)
+
+_OK_STATUSES = frozenset({"ok", "success", "succeeded", "pass", "passed"})
+_ERR_STATUSES = frozenset({"error", "failed", "failure", "blocked"})
+
+
+def tool_result_looks_failed(
+    result: Any,
+    *,
+    tool_name: str = "",
+    status: Any = None,
+    error_type: Any = None,
+    error_message: Any = None,
+) -> bool:
+    """Decide whether a Hermes tool result is a real failure.
+
+    Aligns with Hermes host observer fields (``model_tools._tool_result_observer_fields``):
+    host ``status`` wins when present; JSON payloads fail only when they carry a
+    truthy ``error`` key (or non-zero ``exit_code``); plain text requires strong
+    markers — never bare substring ``error``.
+    """
+    del tool_name  # reserved for future tool-specific heuristics
+    if not isinstance(result, str) or not result.strip():
+        # Host error markers without a body still count.
+        if error_type is not None and str(error_type).strip():
+            return True
+        if status is not None and str(status).strip().lower() in _ERR_STATUSES:
+            return True
+        return False
+
+    text = result.strip()
+    head = text[:2400]
+    low_head = head.lower()
+
+    # Already annotated by spine/cascade — not a new failure to re-scar.
+    if "conductor spine blocked" in low_head or "[integrity cascade]" in low_head:
+        return False
+
+    parsed: Any = None
+    try:
+        parsed = json.loads(text)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        parsed = None
+
+    def _json_exit_failed(obj: Any) -> bool:
+        if not isinstance(obj, dict) or "exit_code" not in obj:
+            return False
+        try:
+            return int(obj["exit_code"]) != 0
+        except (TypeError, ValueError):
+            return False
+
+    # Host observer status wins when present — except shell JSON exit_code
+    # failures, which Hermes often still marks status=ok without an "error" key.
+    if status is not None and str(status).strip() != "":
+        st = str(status).strip().lower()
+        if st in _ERR_STATUSES:
+            return True
+        if st in _OK_STATUSES:
+            if _json_exit_failed(parsed):
+                return True
+            return False
+
+    # Host-derived error_type is authoritative when status was omitted.
+    if error_type is not None and str(error_type).strip():
+        return True
+
+    if isinstance(parsed, dict):
+        err = parsed.get("error")
+        if err:
+            return True
+        if _json_exit_failed(parsed):
+            return True
+        if parsed.get("success") is True or parsed.get("ok") is True:
+            return False
+        # Hermes observer: no error key → ok (do not substring-scan body).
+        return False
+
+    for pat in _STRONG_FAIL_RES:
+        if pat.search(head):
+            return True
+    return False
+
+
 def transform_failed_tool_result(
     tool_name: str = "",
     args: Any = None,
     result: Any = None,
     session_id: str = "",
-    **_: Any,
+    *,
+    status: Any = None,
+    error_type: Any = None,
+    error_message: Any = None,
+    **kwargs: Any,
 ) -> str | None:
-    """On failed Hermes tool results, run integrity cascade annotation when possible."""
-    if not isinstance(result, str) or not result.strip():
-        return None
-    low = result[:800].lower()
-    if not any(
-        x in low
-        for x in (
-            "error",
-            "failed",
-            "denied",
-            "not found",
-            "no such file",
-            "exit code",
-            "traceback",
-            "errno",
-            "blocked",
-        )
+    """On failed Hermes tool results, run integrity cascade annotation when possible.
+
+    Prefer host-provided ``status`` / ``error_type`` / ``error_message`` from
+    Hermes ``transform_tool_result`` kwargs (see ``model_tools.handle_function_call``).
+    Never treat bare substring ``error`` as failure — that scars successful dumps.
+    """
+    # kwargs may carry status under alternate keys from older hosts
+    if status is None:
+        status = kwargs.get("status")
+    if error_type is None:
+        error_type = kwargs.get("error_type")
+    if error_message is None:
+        error_message = kwargs.get("error_message")
+
+    if result is None:
+        result = ""
+    elif not isinstance(result, str):
+        result = str(result)
+
+    if not tool_result_looks_failed(
+        result,
+        tool_name=tool_name,
+        status=status,
+        error_type=error_type,
+        error_message=error_message,
     ):
         return None
 
+    # Synthesize a body when host marked failure with empty payload.
+    if not result.strip():
+        parts = [
+            str(error_type or "").strip(),
+            str(error_message or "").strip(),
+            f"status={status}" if status is not None else "",
+        ]
+        result = " | ".join(p for p in parts if p) or "tool failure (host status)"
+
+    low = result[:800].lower()
     # Don't re-annotate blocks we already issued
     if "conductor spine blocked" in low or "integrity cascade" in low:
         return None
+
+    err_text = (
+        str(error_message).strip()
+        if error_message is not None and str(error_message).strip()
+        else result[:2000]
+    )
 
     sid = ensure_session_id(session_id, create=True)
     if not sid:
@@ -377,9 +507,15 @@ def transform_failed_tool_result(
             store,
             sid,
             tool=tool_name or "hermes_tool",
-            error=result[:2000],
+            error=err_text,
             arguments={**a, "path": path, "command": cmd},
-            meta={"path": path, "command": cmd, "source": "hermes_engine"},
+            meta={
+                "path": path,
+                "command": cmd,
+                "source": "hermes_engine",
+                "host_status": str(status) if status is not None else "",
+                "host_error_type": str(error_type) if error_type is not None else "",
+            },
         )
         suffix = report.as_tool_suffix()
         if suffix and suffix not in result:
@@ -387,6 +523,60 @@ def transform_failed_tool_result(
     except Exception:  # noqa: BLE001
         return None
     return None
+
+
+def api_request_error_hook(
+    session_id: str = "",
+    *,
+    error_type: str = "",
+    error_message: str = "",
+    status_code: Any = None,
+    reason: Any = None,
+    provider: str = "",
+    model: str = "",
+    **kwargs: Any,
+) -> None:
+    """Record provider/API failures into the integrity cascade (observer only).
+
+    Hermes fires ``api_request_error`` from the conversation loop after
+    classifying FailoverReason. Conductor scars so pre_llm injection surfaces
+    the wound — never retries the provider itself (host owns failover).
+    """
+    del kwargs  # task_id/turn_id/etc. available later if needed
+    sid = ensure_session_id(session_id, create=True)
+    if not sid:
+        return
+    msg_parts = [
+        str(error_type or "api_error").strip(),
+        str(error_message or "").strip()[:1500],
+    ]
+    if status_code is not None:
+        msg_parts.append(f"status_code={status_code}")
+    if reason is not None and str(reason).strip():
+        msg_parts.append(f"reason={reason}")
+    if provider:
+        msg_parts.append(f"provider={provider}")
+    if model:
+        msg_parts.append(f"model={model}")
+    err = " | ".join(p for p in msg_parts if p)
+    try:
+        from conductor.healing.factor import heal_moment
+        from conductor.session.store import default_session_store
+
+        heal_moment(
+            default_session_store(),
+            sid,
+            tool="provider",
+            error=err or "api_request_error",
+            arguments={},
+            meta={
+                "source": "hermes_api_request_error",
+                "status_code": status_code,
+                "reason": str(reason) if reason is not None else "",
+            },
+        )
+    except Exception:  # noqa: BLE001
+        return
 
 
 def on_session_start_hook(session_id: str = "", **_: Any) -> None:
@@ -436,8 +626,8 @@ def pre_llm_call_hook(
         return None
 
 
-def hermes_bridge_status() -> dict[str, Any]:
-    """Diagnostics for doctor/status."""
+def hermes_bridge_status(**_kwargs: Any) -> dict[str, Any]:
+    """Diagnostics for doctor/status. Accepts host kwargs (ignored)."""
     try:
         from conductor.agent.path_safety import is_shell_denied
 

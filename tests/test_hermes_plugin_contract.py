@@ -46,7 +46,10 @@ def test_plugin_yaml_exists() -> None:
     text = yml.read_text(encoding="utf-8")
     assert "name: conductor" in text
     assert "pre_tool_call" in text
+    assert "transform_tool_result" in text
+    assert "api_request_error" in text
     assert "version:" in text
+    assert "1.18.10" in text
 
 
 def test_register_skips_hermes_core_names(
@@ -82,6 +85,8 @@ def test_register_skips_hermes_core_names(
     assert "pre_tool_call" in ctx.hooks
     assert "pre_llm_call" in ctx.hooks
     assert "on_session_start" in ctx.hooks
+    assert "transform_tool_result" in ctx.hooks
+    assert "api_request_error" in ctx.hooks
     for cmd in ("crucible", "pillars", "combo", "remnant", "track", "conductor-status"):
         assert cmd in ctx.commands
     assert os.environ.get("CONDUCTOR_HOST") == "hermes"

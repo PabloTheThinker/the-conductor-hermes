@@ -191,12 +191,18 @@ def _on_transform_tool_result(
 ):
     from conductor.hermes_bridge import transform_failed_tool_result
 
-    sid = session_id or kwargs.get("session_id") or _session_id()
+    sid = session_id or kwargs.pop("session_id", None) or _session_id()
+    # Drop positional-owned keys so **kwargs never double-binds.
+    for k in ("tool_name", "args", "result", "session_id"):
+        kwargs.pop(k, None)
+    # Pass host observer fields (status / error_type / error_message) through —
+    # Hermes model_tools injects them on transform_tool_result.
     return transform_failed_tool_result(
         tool_name=tool_name,
         args=args,
         result=result,
         session_id=str(sid or ""),
+        **kwargs,
     )
 
 
@@ -220,6 +226,17 @@ def _on_pre_llm_call(
         user_message=user_message,
         **kwargs,
     )
+
+
+def _on_api_request_error(session_id: str = "", **kwargs: Any) -> None:
+    """Observer: scar provider/API failures; Hermes owns retry/failover."""
+    from conductor.hermes_bridge import api_request_error_hook
+
+    sid = session_id or kwargs.get("session_id") or _session_id()
+    try:
+        api_request_error_hook(session_id=str(sid or ""), **kwargs)
+    except Exception:  # noqa: BLE001
+        return
 
 
 def _register_tool_schemas(
@@ -347,6 +364,8 @@ def register(ctx) -> None:
         ("transform_tool_result", _on_transform_tool_result),
         ("on_session_start", _on_session_start),
         ("pre_llm_call", _on_pre_llm_call),
+        # Optional on older Hermes builds — register best-effort.
+        ("api_request_error", _on_api_request_error),
     ):
         try:
             ctx.register_hook(hook_name, cb)

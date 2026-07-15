@@ -66,11 +66,12 @@ Each plugin needs `plugin.yaml` + `register(ctx)`.
 | Hook | Hermes event | Conductor role |
 |------|--------------|----------------|
 | `pre_tool_call` | Before any tool | Path-safety / mass-wipe / thrash guard (**blocks** dangerous host tools; batch/wave-aware thrash) |
-| `transform_tool_result` | After tool result | Integrity cascade on failures |
+| `transform_tool_result` | After tool result | Integrity cascade on **real** failures (host `status` / structured error — not bare “error” text) |
 | `on_session_start` | Session open | Bind session id + Soul Resonance + `CONDUCTOR_HOST=hermes` |
 | `pre_llm_call` | Before model turn | Live memory inject (scars / seals / episodes) |
+| `api_request_error` | Provider/API fail | Observer scar only; Hermes owns retry/failover |
 
-### Host tool batch vs Remnant (1.18.9)
+### Host tool batch vs Remnant (1.18.9+)
 
 Two different parallelisms — do not confuse them:
 

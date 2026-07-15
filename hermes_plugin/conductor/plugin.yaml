@@ -1,5 +1,5 @@
 name: conductor
-version: "1.18.8"
+version: "1.18.10"
 description: >
   The Conductor — enhances any stock Hermes agent with Soul Resonance, pillar
   tools (tracks, Remnants, Crucible, memory, ethics), path-safety spine, and
@@ -13,3 +13,4 @@ hooks:
   - transform_tool_result
   - on_session_start
   - pre_llm_call
+  - api_request_error

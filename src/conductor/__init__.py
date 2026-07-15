@@ -1,3 +1,3 @@
 """The Conductor — skillset module for AI agent harnesses."""
 
-__version__ = "1.18.9"
+__version__ = "1.18.10"

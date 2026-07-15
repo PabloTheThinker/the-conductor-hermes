@@ -25,6 +25,7 @@ ToolClass = Literal["safe_parallel", "barrier", "spawn"]
 WaveId = Literal["A", "B", "C"]
 
 # Primary tables — exact names first, then prefix heuristics.
+# Keep aligned with host-safe reads; expand as Hermes adds observer tools.
 _SAFE_PARALLEL: frozenset[str] = frozenset(
     {
         "read_file",
@@ -49,8 +50,29 @@ _SAFE_PARALLEL: frozenset[str] = frozenset(
         # doctor / readiness (read-only probes)
         "doctor",
         "hermes_ready",
+        # more Hermes / Conductor read-only probes (wave A)
+        "web_search_with_find",
+        "browser_snapshot",
+        "browser_get_content",
+        "list_directory",
+        "glob_files",
+        "grep_files",
+        "project_list",
+        "clarify",  # host UI; no FS mutation
+        "combo",
+        "pillars",
+        "skills_search",
+        "memory_search",
+        "fabric_search",
+        "session_browse",
+        "todo_list",
+        "cronjob_list",
+        "process_list",
     }
 )
+
+# Public mirror for skills / docs / host recipes (same membership as classify).
+HOST_PARALLEL_SAFE: frozenset[str] = _SAFE_PARALLEL
 
 _BARRIER: frozenset[str] = frozenset(
     {
@@ -176,6 +198,11 @@ def wave_for_class(tool_class: ToolClass | str) -> WaveId:
 
 def wave_for_tool(tool_name: str, args: Any = None) -> WaveId:
     return wave_for_class(classify_tool(tool_name, args))
+
+
+def host_parallel_safe(tool_name: str, args: Any = None) -> bool:
+    """True when the tool is wave-A / safe_parallel for host batch recipes."""
+    return classify_tool(tool_name, args) == "safe_parallel"
 
 
 def plan_waves(

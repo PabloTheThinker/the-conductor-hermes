@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "the-conductor"
-version = "1.18.9"
+version = "1.18.10"
 description = "The Conductor — skillset module + MCP server for AI agent harnesses (Hermes-ready)"
 readme = "README.md"
 requires-python = ">=3.11"

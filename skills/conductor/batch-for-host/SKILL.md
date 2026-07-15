@@ -3,7 +3,7 @@ name: batch-for-host
 description: Host tool batching vs Remnant fanout — wave A/B/C, hermes_batch, concurrency, anti-serial patterns.
 ---
 
-# Batch for host (Conductor 1.18.9+)
+# Batch for host (Conductor 1.18.10+)
 
 **Use when:** multi-file reads, mixed edit turns, multi-axis clone spawn, or the agent is serializing tools unnecessarily.
 
@@ -21,11 +21,11 @@ Conductor **never** reimplements Hermes tool-batch segmentation.
 
 | Wave | Class | Do |
 |------|--------|-----|
-| **A** | safe_parallel | Reads, status, doctor, search — fire together |
+| **A** | safe_parallel | Reads, status, doctor, search — fire together (`HOST_PARALLEL_SAFE` / `host_parallel_safe()`) |
 | **B** | barrier | Writes, patch, terminal — host may segment; still emit in the **same** batch as A when possible |
 | **C** | spawn | One `hermes_batch` / multi-`spawn_subagent` — not N serial parent turns |
 
-Module: `conductor.core.wave_planner` (`classify_tool`, `plan_waves`).
+Module: `conductor.core.wave_planner` (`classify_tool`, `plan_waves`, `host_parallel_safe`).
 
 ## Recipes
 
@@ -58,6 +58,11 @@ delegation:
 
 Check: `conductor hermes-ready` → `delegation_concurrency`.
 
+## Thrash + host kwargs (1.18.10)
+
+- `record_and_check(store, session_id, tool_name, args=None, *, batch_id=None, wave_id=None)`
+- Failure scars need host `status`/`error_type` or structured JSON — bare `"error"` in success dumps must **not** scar
+
 ## Anti-patterns
 
 - Serialize whole turn because one write exists among many reads
@@ -65,6 +70,7 @@ Check: `conductor hermes-ready` → `delegation_concurrency`.
 - Fanout on single-file / kill-the-port work
 - Reimplementing host segmentation inside Conductor
 - Ritual-only: reading `tool_calls` without spawning
+- Scaring on content that merely contains the word “error”
 
 ## Related
 

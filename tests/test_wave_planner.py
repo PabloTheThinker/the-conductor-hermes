@@ -1,10 +1,12 @@
-"""Wave planner, thrash batch-awareness, hermes_batch waves (1.18.9)."""
+"""Wave planner, thrash batch-awareness, hermes_batch waves (1.18.10)."""
 
 from __future__ import annotations
 
 from conductor.core.wave_planner import (
+    HOST_PARALLEL_SAFE,
     WAVE_ORDER,
     classify_tool,
+    host_parallel_safe,
     hybrid_safe_preflight_pack,
     parallel_recipe_thin,
     plan_waves,
@@ -23,6 +25,13 @@ def test_classify_safe_barrier_spawn():
     assert classify_tool("remnant_orchestrate", {"action": "status"}) == "safe_parallel"
     assert classify_tool("remnant_orchestrate", {"action": "fanout"}) == "spawn"
     assert classify_tool("totally_unknown_tool_xyz") == "barrier"
+    # expanded wave-A (1.18.10) — host-aligned reads
+    for name in ("web_search", "web_extract", "session_search", "skill_view", "vision_analyze"):
+        assert classify_tool(name) == "safe_parallel"
+        assert host_parallel_safe(name) is True
+        assert name in HOST_PARALLEL_SAFE
+    assert host_parallel_safe("write_file") is False
+    assert host_parallel_safe("delegate_task") is False
 
 
 def test_plan_waves_orders_a_b_c():

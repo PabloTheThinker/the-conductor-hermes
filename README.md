@@ -12,7 +12,7 @@ Amplify the meister — never replace them.
 <br/>
 
 [![GitHub](https://img.shields.io/badge/GitHub-the--conductor--hermes-0D1117?style=for-the-badge&logo=github&logoColor=white)](https://github.com/PabloTheThinker/the-conductor-hermes)
-[![Version](https://img.shields.io/badge/v1.18.8-111111?style=for-the-badge)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/v1.18.10-111111?style=for-the-badge)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](pyproject.toml)
 [![License](https://img.shields.io/badge/License-MIT-2EA44F?style=for-the-badge)](LICENSE)
 [![Package](https://img.shields.io/badge/pip-the--conductor-informational?style=for-the-badge)](pyproject.toml)

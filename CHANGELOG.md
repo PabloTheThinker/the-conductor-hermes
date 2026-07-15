@@ -4,6 +4,30 @@ Notable changes. Newest first.
 
 ---
 
+## [2026-07-15] — Hermes-aligned failure detection + wave A expand (1.18.10)
+
+### Fixed
+- **False-positive scars:** `tool_result_looks_failed` no longer treats bare substring `error` / success dumps as failures. Aligns with Hermes `_tool_result_observer_fields`: prefer host `status` / `error_type` / `error_message`; JSON dict with truthy `"error"` key; `exit_code != 0`; strong plain-text markers only.
+- Transform path synthesizes a body when host marks failure with empty payload so cascade still scars.
+- Status tools accept host kwargs: `hermes_bridge_status(**_)`, `hermes_host_status(**_)`.
+
+### Added
+- Hook `api_request_error` → scar provider/API failures (observer only; Hermes owns failover).
+- `HOST_PARALLEL_SAFE` + `host_parallel_safe()` public mirror of wave-A / host-safe reads.
+- Expanded wave-A table (`session_search`, `skill_view`, `web_extract`, `vision_analyze`, …).
+- `tests/test_hermes_failure_detect.py`.
+
+### Changed
+- Version **1.18.10**
+- Plugin `transform_tool_result` forwards host observer kwargs into the bridge.
+- `plugin.yaml` declares `api_request_error`.
+
+### Notes
+- Waves remain **advisory** labels + thrash `batch_id` / `wave_id`. Hermes owns tool-batch segmentation. Do not reimplement a dual scheduler.
+- Thrash API: `record_and_check(store, session_id, tool_name, args=None, *, batch_id, wave_id)`.
+
+---
+
 ## [2026-07-15] — Host tool waves + batch-for-host (1.18.9)
 
 ### Added

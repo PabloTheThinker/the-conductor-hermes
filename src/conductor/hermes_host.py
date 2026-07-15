@@ -46,7 +46,8 @@ def hermes_available() -> bool:
     return hermes_bin() is not None
 
 
-def hermes_host_status() -> dict[str, Any]:
+def hermes_host_status(**_kwargs: Any) -> dict[str, Any]:
+    """Host discovery diagnostics. Accepts host kwargs (ignored)."""
     from conductor.bootstrap import ensure_conductor_importable, package_src_root
 
     path = hermes_bin()
