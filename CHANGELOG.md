@@ -4,6 +4,27 @@ Notable changes. Newest first.
 
 ---
 
+## [2026-07-15] — Host tool waves + batch-for-host (1.18.9)
+
+### Added
+- `conductor.core.wave_planner` — tool classes (`safe_parallel` / `barrier` / `spawn`), waves **A→B→C**, `plan_waves`, `parallel_recipe_thin`, `hybrid_safe_preflight_pack`
+- Fanout / `hermes_batch` carry advisory `waves` + `batch_id` (thrash-aware)
+- Thin + full orchestration recipes: `host_batch_policy`, wave order, anti “dual-own Hermes segmentation”
+- `skills/conductor/batch-for-host` — when to batch host tools vs Remnant fanout
+- `hermes-ready` / doctor info checks: `delegation_concurrency`, `delegation_spawn_depth`
+- Batch-aware thrash: optional `batch_id` / `wave_id` on fingerprint (Hermes `pre_tool_call`)
+- Docs: ORCHESTRATION tool classes + waves; HERMES “Host tool batch vs Remnant”
+- `tests/test_wave_planner.py`
+
+### Changed
+- Version **1.18.9**
+- Hybrid dispatch uses shared `hybrid_safe_preflight_pack` shape
+
+### Fixed
+- Guidance: do not serialize whole turns for one barrier tool among safe reads
+
+---
+
 ## [2026-07-14] — Public hygiene + module CLI entry (1.18.8)
 
 ### Added

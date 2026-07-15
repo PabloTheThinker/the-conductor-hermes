@@ -65,10 +65,38 @@ Each plugin needs `plugin.yaml` + `register(ctx)`.
 
 | Hook | Hermes event | Conductor role |
 |------|--------------|----------------|
-| `pre_tool_call` | Before any tool | Path-safety / mass-wipe / thrash guard (**blocks** dangerous host tools) |
+| `pre_tool_call` | Before any tool | Path-safety / mass-wipe / thrash guard (**blocks** dangerous host tools; batch/wave-aware thrash) |
 | `transform_tool_result` | After tool result | Integrity cascade on failures |
 | `on_session_start` | Session open | Bind session id + Soul Resonance + `CONDUCTOR_HOST=hermes` |
 | `pre_llm_call` | Before model turn | Live memory inject (scars / seals / episodes) |
+
+### Host tool batch vs Remnant (1.18.9)
+
+Two different parallelisms — do not confuse them:
+
+| Layer | What | Who schedules | When |
+|-------|------|---------------|------|
+| **Host tool batch** | Many tools in one model turn (`read_file`×N + `patch` + …) | **Hermes** (may segment large mixed batches) | Default for thin work and multi-read preflight |
+| **Remnant / clone fanout** | Multi-axis subagents via `hermes_batch` → `delegate_task(tasks=[…])` | Parent + Hermes `delegation.max_concurrent_children` | Full mode / multi-surface goals / Combo C |
+
+**Rules**
+
+1. Prefer **one large mixed tool batch** for host work. Do **not** reimplement Hermes segmentation inside Conductor.
+2. Do **not** serialize the whole turn because one write/barrier tool exists among reads.
+3. Wave labels **A → B → C** (reads → writes → spawn) are advisory on fanout payloads (`waves`, `batch_id`).
+4. Multi-clone spawn: **one** `hermes_batch` / `delegate_task(tasks=[…])`, not N serial spawns.
+5. Raise concurrency when fanout n > default:
+
+```yaml
+# $HERMES_HOME/config.yaml
+delegation:
+  max_concurrent_children: 6   # default often 3
+  # max_spawn_depth: 1         # clones cannot nest (default)
+```
+
+`conductor hermes-ready` / `doctor` report `delegation_concurrency` (info). Skill: `skills/conductor/batch-for-host`.
+
+See [ORCHESTRATION.md](./ORCHESTRATION.md) § Tool classes + waves.
 
 ### Skills on Hermes
 

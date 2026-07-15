@@ -590,20 +590,35 @@ def _infer_role(text: str) -> str:
 
 def _recipe(mode: str) -> dict[str, Any]:
     if mode == "thin":
+        try:
+            from conductor.core.wave_planner import parallel_recipe_thin
+
+            thin_parallel = parallel_recipe_thin(stuck=False)
+        except Exception:  # noqa: BLE001
+            thin_parallel = None
         return {
             "name": "thin",
             "steps": [
                 "1. conductor_start_pack (done) — keep session_id",
-                "2. Host tools only: edit / run / test / deploy",
-                "3. memory_episodic write outcome with tags (optional but preferred)",
-                "4. Do NOT fanout remnants, pillar_status, or governance unless blocked",
+                "2. Host tools only: prefer ONE large mixed batch (reads+writes); "
+                "host may segment — do not reimplement Hermes scheduler",
+                "3. Wave advisory: A reads/status → B writes → C spawn (only if stuck)",
+                "4. memory_episodic write outcome with tags (optional but preferred)",
+                "5. Do NOT fanout remnants, pillar_status, or governance unless blocked",
             ],
             "forbidden_unless_stuck": [
                 "remnant_orchestrate fanout",
                 "pillar_status",
                 "crucible_workspace",
                 "governance_audit",
+                "serializing whole turn because one barrier tool exists",
             ],
+            "parallel_recipe": thin_parallel,
+            "wave_order": ["A", "B", "C"],
+            "host_batch_policy": {
+                "prefer_single_batch": True,
+                "do_not_dual_own_hermes_segmentation": True,
+            },
         }
     return {
         "name": "full",
@@ -611,7 +626,8 @@ def _recipe(mode: str) -> dict[str, Any]:
             "1. conductor_start_pack (done) — note axes + fanout_ready",
             "2. remnant_orchestrate action=fanout dispatch=host|hermes objectives=axes",
             "3. PARENT (not MCP): SPAWN host tools THIS turn — Grok spawn_subagent "
-            "×N from tool_calls[i].arguments OR Hermes hermes_batch delegate_task(tasks)",
+            "×N from tool_calls[i].arguments OR Hermes hermes_batch delegate_task(tasks) "
+            "(wave C; waves field on fanout payload)",
             "4. remnant_orchestrate action=spawn_ack handles=[{remnant_id, clone_handle}]",
             "5. When each clone finishes: remnant_orchestrate action=report",
             "6. remnant_orchestrate action=merge when await ready",
@@ -622,7 +638,14 @@ def _recipe(mode: str) -> dict[str, Any]:
             "dispatch=local when host can spawn (local is fallback only)",
             "reading tool_calls without spawning (ritual without clones)",
             "implementing all axes yourself while tool_calls sit unread",
+            "reimplementing Hermes tool-batch segmentation inside Conductor",
         ],
+        "wave_order": ["A", "B", "C"],
+        "host_batch_policy": {
+            "prefer_single_batch": True,
+            "spawn_preference": "hermes_batch / delegate_task(tasks=[…])",
+            "do_not_dual_own_hermes_segmentation": True,
+        },
     }
 
 

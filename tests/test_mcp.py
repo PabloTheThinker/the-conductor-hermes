@@ -118,6 +118,9 @@ def test_shadow_clone_host_report_merge(
 ) -> None:
     """Host mode: spawn_requests → report → merge (shadow clone contract)."""
     monkeypatch.setenv("CONDUCTOR_HOME", str(conductor_home))
+    # Isolate from session CONDUCTOR_HOST=hermes (this test is Grok-shaped)
+    monkeypatch.setenv("CONDUCTOR_HOST", "grok")
+    monkeypatch.delenv("CONDUCTOR_MCP_HOST", raising=False)
     sid = json.loads(dispatch_tool("conductor_session", {"title": "host-clones"}))["session_id"]
     raw = dispatch_tool(
         "remnant_orchestrate",

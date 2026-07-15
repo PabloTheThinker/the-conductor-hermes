@@ -428,7 +428,19 @@ def execute_tool_detailed(
         try:
             from conductor.loop_thrash import record_and_check
 
-            hit = record_and_check(store, session_id, name, arguments)
+            batch_id = None
+            wave_id = None
+            if isinstance(arguments, dict):
+                batch_id = arguments.get("_conductor_batch") or arguments.get("batch_id")
+                wave_id = arguments.get("_conductor_wave") or arguments.get("wave_id")
+            hit = record_and_check(
+                store,
+                session_id,
+                name,
+                arguments,
+                batch_id=str(batch_id) if batch_id else None,
+                wave_id=str(wave_id) if wave_id else None,
+            )
             if hit.blocked:
                 return err_result(hit.message, tool=name, thrash=True, denied=True)
         except Exception:  # noqa: BLE001

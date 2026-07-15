@@ -420,6 +420,75 @@ def hermes_ready_report(*, home: Path | None = None) -> ReadyReport:
         )
     )
 
+    # 1.18.9+: delegation concurrency for hermes_batch / multi-clone fanout
+    try:
+        max_cc = None
+        del_cfg: dict[str, Any] = {}
+        try:
+            import yaml
+
+            raw = yaml.safe_load((h / "config.yaml").read_text(encoding="utf-8")) or {}
+            del_cfg = (raw.get("delegation") or {}) if isinstance(raw, dict) else {}
+            if isinstance(del_cfg, dict):
+                raw_cc = del_cfg.get("max_concurrent_children")
+                if raw_cc is not None:
+                    max_cc = int(raw_cc)
+        except Exception:  # noqa: BLE001
+            max_cc = None
+        # Hermes defaults to 3 when unset
+        effective = max_cc if max_cc is not None else 3
+        # Soft gate: warn when below 4 so multi-axis fanout is visible
+        ok_cc = effective >= 3
+        msg_cc = (
+            f"delegation.max_concurrent_children={effective}"
+            + ("" if max_cc is not None else " (Hermes default; unset in config)")
+            + (
+                " — raise for fanout n>3 (conductor batch-for-host skill)"
+                if effective < 4
+                else " — suitable for multi-clone hermes_batch"
+            )
+        )
+        checks.append(
+            ReadyCheck(
+                id="delegation_concurrency",
+                ok=ok_cc,
+                message=msg_cc,
+                fix=(
+                    "In $HERMES_HOME/config.yaml set:\n"
+                    "  delegation:\n"
+                    "    max_concurrent_children: 6  # or >= planned hermes_batch size\n"
+                    "See docs/HERMES.md § Host tool batch vs Remnant"
+                ),
+                level="info",
+            )
+        )
+        # nested spawn depth (info)
+        try:
+            depth = del_cfg.get("max_spawn_depth") if isinstance(del_cfg, dict) else None
+            depth_i = int(depth) if depth is not None else 1
+        except (TypeError, ValueError):
+            depth_i = 1
+        checks.append(
+            ReadyCheck(
+                id="delegation_spawn_depth",
+                ok=True,
+                message=(
+                    f"delegation.max_spawn_depth={depth_i} "
+                    "(clones cannot nest when 1 — matches Grok/Hermes depth-1 contract)"
+                ),
+                level="info",
+            )
+        )
+    except Exception as exc:  # noqa: BLE001
+        checks.append(
+            ReadyCheck(
+                id="delegation_concurrency",
+                ok=True,
+                message=f"concurrency probe skipped: {exc}",
+                level="info",
+            )
+        )
+
     required_fail = [c for c in checks if c.level == "required" and not c.ok]
     return ReadyReport(
         ok=len(required_fail) == 0,

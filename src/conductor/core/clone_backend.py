@@ -86,11 +86,26 @@ def dispatch_clones(
             findings = list(loc.get("findings") or [])[:8]
             files = list(loc.get("files_examined") or [])[:12]
             if findings or files:
+                try:
+                    from conductor.core.wave_planner import hybrid_safe_preflight_pack
+
+                    preflight = hybrid_safe_preflight_pack(
+                        findings=findings,
+                        files_examined=files,
+                        work_root=work_root,
+                    )
+                except Exception:  # noqa: BLE001
+                    preflight = {
+                        "findings": findings,
+                        "files_examined": files,
+                        "backend": "local",
+                        "wave": "A",
+                        "tool_class": "safe_parallel",
+                    }
                 pack = {
                     **pack,
                     "local_preflight": {
-                        "findings": findings,
-                        "files_examined": files,
+                        **preflight,
                         "backend": "local",
                     },
                     "steps": list(pack.get("steps") or [])
@@ -174,10 +189,49 @@ def dispatch_clones(
         if host in {"claude", "anthropic"}
         else "spawn_subagent"
     )
+    # Wave plan for host spawn requests (all wave C; hybrid preflight = A)
+    try:
+        from conductor.core.wave_planner import plan_waves, WAVE_LABELS
+
+        wave_plan = plan_waves(requests)
+    except Exception:  # noqa: BLE001
+        wave_plan = {
+            "summary": {"A": 0, "B": 0, "C": n, "total": n},
+            "wave_order": ["A", "B", "C"],
+            "wave_labels": {"A": "reads", "B": "writes", "C": "spawn"},
+            "guidance": f"Wave C spawn batch n={n}",
+        }
+        WAVE_LABELS = {"A": "reads", "B": "writes", "C": "spawn"}  # type: ignore[misc]
+
+    hybrid_preflight_n = len(local_results) if mode == "hybrid" else 0
+    waves_field = {
+        "order": list(wave_plan.get("wave_order") or ["A", "B", "C"]),
+        "labels": dict(wave_plan.get("wave_labels") or WAVE_LABELS),
+        "summary": dict(wave_plan.get("summary") or {}),
+        "A": {
+            "count": hybrid_preflight_n,
+            "kind": "hybrid_safe_preflight" if hybrid_preflight_n else "none",
+            "note": (
+                "Local scan already ran; do not re-scan same paths."
+                if hybrid_preflight_n
+                else "No wave-A work in this fanout payload."
+            ),
+        },
+        "B": {"count": 0, "note": "Writes happen inside host children, not parent fanout."},
+        "C": {
+            "count": n,
+            "spawn_count": n,
+            "prefer": "hermes_batch / one multi-task spawn" if n > 1 else "single spawn",
+            "batch_id": (hermes_batch or {}).get("batch_id"),
+        },
+        "guidance": wave_plan.get("guidance")
+        or "Prefer one host batch this turn; host may segment tools.",
+        "do_not_dual_own_scheduler": True,
+    }
     protocol = {
         "steps": [
             f"1. SPAWN: call host tool {host_tool} for EVERY tool_calls[i] "
-            "(or hermes_batch once) in THIS turn — parallel",
+            "(or hermes_batch once) in THIS turn — parallel (wave C)",
             "2. spawn_ack: remnant_orchestrate action=spawn_ack with "
             "[{remnant_id, clone_handle}, …]",
             "3. When each child finishes: remnant_orchestrate action=report",
@@ -185,10 +239,12 @@ def dispatch_clones(
         ],
         "host_tool": host_tool,
         "parallel": True,
+        "wave": "C",
         "mcp_cannot_spawn": True,
         "note": (
             "MCP cannot call Grok/Hermes tools. You (the parent) must execute "
-            "host spawn tools; Conductor only tracks remnant_ids + report/merge."
+            "host spawn tools; Conductor only tracks remnant_ids + report/merge. "
+            "Hermes segments large mixed tool batches — do not reimplement that here."
         ),
     }
     concurrency_note = None
@@ -212,6 +268,7 @@ def dispatch_clones(
         "spawn_count": n,
         "protocol": protocol,
         "hermes_batch": hermes_batch,
+        "waves": waves_field,
         "concurrency_note": concurrency_note,
         "anti_theater": (
             "Do not implement all axes yourself. SPAWN tool_calls / hermes_batch "
@@ -222,7 +279,8 @@ def dispatch_clones(
         "note": (
             "Shadow clones await host subagents. parent_must_spawn=true: execute "
             "host tools THIS turn, then spawn_ack → report → merge. "
-            "MCP cannot spawn — only the parent can."
+            "MCP cannot spawn — only the parent can. "
+            "waves.C marks host spawn batch (advisory; host owns scheduling)."
         ),
     }
 
@@ -300,7 +358,11 @@ def _mandatory_host_action(host: str, *, n: int = 0) -> str:
 
 
 def _build_hermes_batch(requests: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """One Hermes delegate_task(tasks=[…]) for parallel batch fan-out."""
+    """One Hermes delegate_task(tasks=[…]) for parallel batch fan-out.
+
+    1.18.9+: includes ``waves`` (wave C spawn batch) and batch_id for thrash.
+    Conductor does **not** segment host tool schedules — Hermes does.
+    """
     if not requests:
         return None
     tasks: list[dict[str, str]] = []
@@ -316,16 +378,33 @@ def _build_hermes_batch(requests: list[dict[str, Any]]) -> dict[str, Any] | None
     if not tasks:
         return None
     n = len(tasks)
+    batch_id = f"hermes_batch:{n}:{remnant_ids[0][:8] if remnant_ids else 'x'}"
     return {
         "tool": "delegate_task",
-        "arguments": {"tasks": tasks},
+        "arguments": {
+            "tasks": tasks,
+            # thrash / wave meta (host ignores unknown keys safely)
+            "_conductor_batch": batch_id,
+            "_conductor_wave": "C",
+        },
         "remnant_ids": remnant_ids,
+        "batch_id": batch_id,
+        "wave": "C",
+        "tool_class": "spawn",
+        "waves": {
+            "C": {
+                "count": n,
+                "remnant_ids": remnant_ids,
+                "label": "delegate / remnant / host spawn",
+            }
+        },
         "requires_config": {
             "delegation.max_concurrent_children": f">={n}",
         },
         "note": (
             "Call Hermes native tool delegate_task ONCE with arguments.tasks. "
-            "Index i maps to remnant_ids[i] for spawn_ack + report."
+            "Index i maps to remnant_ids[i] for spawn_ack + report. "
+            "Wave C batch — do not reimplement Hermes tool-batch segmentation."
         ),
     }
 

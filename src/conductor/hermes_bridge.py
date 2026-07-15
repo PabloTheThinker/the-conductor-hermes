@@ -282,7 +282,27 @@ def pre_tool_call_hook(
         sid = ensure_session_id(str(sid or ""), create=False) or "ephemeral"
         # Durable store only for real sessions — ephemeral stays memory-only
         store = default_session_store() if sid != "ephemeral" else None
-        hit = record_and_check(store, sid, tool_name, args)
+        batch_id = None
+        wave_id = None
+        if isinstance(args, dict):
+            batch_id = (
+                args.get("_conductor_batch")
+                or args.get("batch_id")
+                or kwargs.get("batch_id")
+            )
+            wave_id = (
+                args.get("_conductor_wave")
+                or args.get("wave_id")
+                or kwargs.get("wave_id")
+            )
+        hit = record_and_check(
+            store,
+            sid,
+            tool_name,
+            args,
+            batch_id=str(batch_id) if batch_id else None,
+            wave_id=str(wave_id) if wave_id else None,
+        )
         if hit.blocked:
             msg = hit.message
             # Attach loop policy scope: stop this fingerprint, not the mission
