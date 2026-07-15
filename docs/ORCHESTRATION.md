@@ -100,7 +100,7 @@ Conductor **does not** reimplement Hermes tool-batch segmentation. It classifies
 
 Module: `conductor.core.wave_planner` — `classify_tool`, `host_parallel_safe`, `plan_waves`, `parallel_recipe_thin`, `hybrid_safe_preflight_pack`.
 
-**1.18.10 failure detection:** scars only on host `status`/`error_type`, JSON truthy `error` / non-zero `exit_code`, or strong plain-text markers — never bare substring `error` in success dumps.
+**1.18.10–1.18.11 failure detection:** scars only on host `status`/`error_type`, JSON truthy `error` / non-zero `exit_code`/`returncode`, or strong plain-text markers — never bare substring `error` in success dumps. JSON **arrays** do not body-scan. Status **`completed`/`done`** count as ok. After any detector ship, **restart hermes-serve** so live modules match disk.
 
 ### Constraints (Grok)
 

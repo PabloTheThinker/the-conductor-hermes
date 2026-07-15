@@ -4,6 +4,23 @@ Notable changes. Newest first.
 
 ---
 
+## [2026-07-15] — Live-cascade self-heal + detector harden (1.18.11)
+
+### Fixed
+- **JSON arrays** never trigger body strong-marker scars (success multi-part dumps).
+- Host status **`completed` / `complete` / `done`** treated as ok (docs matched, code lagged).
+- Host status **`timeout` / `timed_out` / `cancelled`** treated as fail.
+- Non-zero **`returncode` / `return_code`** counted like `exit_code`.
+- Live false cascade root: disk **1.18.10+** with **stale hermes-serve process** (started before module mtime) — restart required; detector offline was already correct.
+
+### Changed
+- Version **1.18.11**
+
+### Notes
+- After ship: `sudo -n systemctl restart hermes-serve` (and gateway if it imports conductor). Disk version ≠ live modules until process restart.
+
+---
+
 ## [2026-07-15] — Hermes-aligned failure detection + wave A expand (1.18.10)
 
 ### Fixed

@@ -342,8 +342,30 @@ _STRONG_FAIL_RES: tuple[re.Pattern[str], ...] = (
     re.compile(r"\b(?:http\s*)?status(?:\s*code)?[:\s]+(?:401|403|404|429|5\d\d)\b", re.I),
 )
 
-_OK_STATUSES = frozenset({"ok", "success", "succeeded", "pass", "passed"})
-_ERR_STATUSES = frozenset({"error", "failed", "failure", "blocked"})
+_OK_STATUSES = frozenset(
+    {
+        "ok",
+        "success",
+        "succeeded",
+        "pass",
+        "passed",
+        "completed",
+        "complete",
+        "done",
+    }
+)
+_ERR_STATUSES = frozenset(
+    {
+        "error",
+        "failed",
+        "failure",
+        "blocked",
+        "timeout",
+        "timed_out",
+        "cancelled",
+        "canceled",
+    }
+)
 
 
 def tool_result_looks_failed(
@@ -357,9 +379,9 @@ def tool_result_looks_failed(
     """Decide whether a Hermes tool result is a real failure.
 
     Aligns with Hermes host observer fields (``model_tools._tool_result_observer_fields``):
-    host ``status`` wins when present; JSON payloads fail only when they carry a
-    truthy ``error`` key (or non-zero ``exit_code``); plain text requires strong
-    markers — never bare substring ``error``.
+    host ``status`` wins when present; JSON dicts fail only with truthy ``error``
+    or non-zero ``exit_code``; JSON arrays never fail via body scan; plain text
+    requires strong markers — never bare substring ``error``.
     """
     del tool_name  # reserved for future tool-specific heuristics
     if not isinstance(result, str) or not result.strip():
@@ -385,10 +407,13 @@ def tool_result_looks_failed(
         parsed = None
 
     def _json_exit_failed(obj: Any) -> bool:
-        if not isinstance(obj, dict) or "exit_code" not in obj:
+        if not isinstance(obj, dict):
+            return False
+        code = obj.get("exit_code", obj.get("returncode", obj.get("return_code")))
+        if code is None:
             return False
         try:
-            return int(obj["exit_code"]) != 0
+            return int(code) != 0
         except (TypeError, ValueError):
             return False
 
@@ -406,6 +431,10 @@ def tool_result_looks_failed(
     # Host-derived error_type is authoritative when status was omitted.
     if error_type is not None and str(error_type).strip():
         return True
+
+    # JSON list/array payloads: never substring-scan (success dumps embed words).
+    if isinstance(parsed, list):
+        return False
 
     if isinstance(parsed, dict):
         err = parsed.get("error")

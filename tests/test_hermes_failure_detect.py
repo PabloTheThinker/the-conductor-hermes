@@ -65,3 +65,27 @@ def test_error_type_without_body():
     assert tool_result_looks_failed(None, error_type="RateLimitError") is True
     assert tool_result_looks_failed("", status="error") is True
     assert tool_result_looks_failed(None) is False
+
+
+def test_json_array_payload_is_ok():
+    body = json.dumps(
+        [
+            {"path": "a.py", "content": "handles error_type cleanly"},
+            {"path": "b.py", "content": "no traceback here"},
+        ]
+    )
+    assert tool_result_looks_failed(body) is False
+    assert tool_result_looks_failed(body, status="ok") is False
+    assert tool_result_looks_failed(body, status="completed") is False
+
+
+def test_host_status_completed_is_ok():
+    body = "ERROR: log line from a green tool dump"
+    assert tool_result_looks_failed(body, status="completed") is False
+    assert tool_result_looks_failed(body, status="done") is False
+
+
+def test_returncode_nonzero_counts_as_exit_fail():
+    body = json.dumps({"returncode": 2, "output": "fail"})
+    assert tool_result_looks_failed(body) is True
+    assert tool_result_looks_failed(body, status="ok") is True
