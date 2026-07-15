@@ -19,8 +19,8 @@ Amplify the meister — never replace them.
 
 <br/>
 
-| [About](#about) | [Paths](#choose-your-path) | [Install](#quick-start) | [Packages](#packages--stack) | [Concepts](#core-concepts) | [Docs](#documentation) | [Mascot](#character) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [About](#about) | [Paths](#choose-your-path) | [Install](#quick-start) | [Packages](#packages--stack) | [Concepts](#core-concepts) | [Docs](#documentation) |
+|:---:|:---:|:---:|:---:|:---:|:---:|
 
 </div>
 
@@ -341,38 +341,6 @@ Always installed with the package:
 | [SECURITY](SECURITY.md) | Security policy |
 
 </details>
-
----
-
-## Character
-
-<div align="center">
-
-The product face — pure **black & white graphic ink**, sibling language to Hermes brand art, **not** the Hermes girl.
-
-Slim **earpiece** + **collar mark** (crossed batons / signal) = multi-agent orchestration with intentional direction.
-
-<br/>
-
-| Primary | Portrait | Alt |
-|:-------:|:--------:|:---:|
-| <img src="docs/assets/conductor.png" alt="Conductor primary logo" width="180" /> | <img src="docs/assets/conductor-portrait.png" alt="Conductor portrait" width="135" /> | <img src="docs/assets/conductor-alt.png" alt="Conductor alternate pose" width="180" /> |
-| Square hero / social | Full crop | Formal sibling |
-
-<br/>
-
-**Desktop wallpaper** — 1920×1080 solid ink · profile + constellation
-
-<img src="docs/assets/conductor-wallpaper.png" alt="Conductor desktop wallpaper 1920x1080" width="720" />
-
-</div>
-
-| File | Use |
-|------|-----|
-| [`docs/assets/conductor.png`](docs/assets/conductor.png) | **Primary** square logo (README hero) |
-| [`docs/assets/conductor-portrait.png`](docs/assets/conductor-portrait.png) | Full portrait |
-| [`docs/assets/conductor-alt.png`](docs/assets/conductor-alt.png) | Alternate formal pose |
-| [`docs/assets/conductor-wallpaper.png`](docs/assets/conductor-wallpaper.png) | **1920×1080** desktop wallpaper (profile constellation) |
 
 ---
 

@@ -4,6 +4,16 @@ Notable changes. Newest first.
 
 ---
 
+## [2026-07-15] — Remove Character/mascot section (docs)
+
+### Changed
+- README: dropped **Character** / mascot gallery and nav link (product face stays top hero only).
+
+### Notes
+- Docs-only; package version remains **1.18.11**. Asset files under `docs/assets/` retained for hero/brand use.
+
+---
+
 ## [2026-07-15] — Product-first public face (docs)
 
 ### Changed
