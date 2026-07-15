@@ -4,6 +4,17 @@ Notable changes. Newest first.
 
 ---
 
+## [2026-07-15] — Professional author surface (docs)
+
+### Added
+- `docs/ABOUT.md` — project + author (Pablo Navarro / Vektra Industries), contact, principles.
+- README **Author** section and docs index link.
+
+### Notes
+- Docs-only; package version remains **1.18.11**.
+
+---
+
 ## [2026-07-15] — Live-cascade self-heal + detector harden (1.18.11)
 
 ### Fixed
