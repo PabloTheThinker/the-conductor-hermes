@@ -113,7 +113,7 @@ This is a living document. It will evolve with the project.
 
 ---
 
-**Maintained by**: Pablo Navarro (Founder)  
+**Maintained by**: The Conductor project  
 **Last Updated**: July 2026
 
 ---

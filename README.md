@@ -19,8 +19,8 @@ Amplify the meister — never replace them.
 
 <br/>
 
-| [About](#about) | [Paths](#choose-your-path) | [Install](#quick-start) | [Packages](#packages--stack) | [Concepts](#core-concepts) | [Author](#author) | [Docs](#documentation) | [Mascot](#character) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| [About](#about) | [Paths](#choose-your-path) | [Install](#quick-start) | [Packages](#packages--stack) | [Concepts](#core-concepts) | [Docs](#documentation) | [Mascot](#character) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 
 </div>
 
@@ -80,26 +80,10 @@ Direction without replacing native tools.
 
 <div align="center">
 
-**Built by** [Pablo Navarro](https://github.com/PabloTheThinker) · **Vektra Industries** · MIT  
-[About the author](docs/ABOUT.md) · [github.com/PabloTheThinker/the-conductor-hermes](https://github.com/PabloTheThinker/the-conductor-hermes)
+**Open source** · MIT · [docs/ABOUT.md](docs/ABOUT.md)  
+[github.com/PabloTheThinker/the-conductor-hermes](https://github.com/PabloTheThinker/the-conductor-hermes)
 
 </div>
-
----
-
-## Author
-
-**Pablo Navarro** — Founder & CEO, [Vektra Industries](https://pablothethinker.com).  
-Architects cognitive frameworks and autonomous-agent infrastructure: orchestration modules, multi-agent coordination, and safety spines that **enhance** the host meister rather than replace it.
-
-| | |
-|--|--|
-| GitHub | [@PabloTheThinker](https://github.com/PabloTheThinker) |
-| Site | [pablothethinker.com](https://pablothethinker.com) |
-| X | [@pablothethinker](https://x.com/pablothethinker) |
-| Stance | *“See a path, secure a path.”* |
-
-Full professional context: **[docs/ABOUT.md](docs/ABOUT.md)** (project + author + contact).
 
 ---
 
@@ -326,7 +310,7 @@ Always installed with the package:
 
 | Start here | Audience |
 |------------|----------|
-| [**About**](docs/ABOUT.md) | Author, Vektra, contact |
+| [**About**](docs/ABOUT.md) | Product context · contact · security |
 | [**MCP**](docs/MCP.md) | Claude, Codex, Cursor, Grok |
 | [**Hermes**](docs/HERMES.md) | Plugin, install, spine |
 | [**Module for agents**](docs/MODULE_FOR_AGENTS.md) | Custom hosts |
@@ -340,7 +324,7 @@ Always installed with the package:
 
 | Doc | Topic |
 |-----|-------|
-| [ABOUT](docs/ABOUT.md) | Author · Vektra · contact |
+| [ABOUT](docs/ABOUT.md) | Product context · contact |
 | [OPERATOR_FLOW](docs/OPERATOR_FLOW.md) | Thin vs full flow |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | System map + package layout |
 | [PILLARS](docs/PILLARS.md) | Pillar foundation |
@@ -396,8 +380,8 @@ Slim **earpiece** + **collar mark** (crossed batons / signal) = multi-agent orch
 
 ## License
 
-**MIT** © 2026 Pablo Navarro / Vektra Industries  
-See [LICENSE](LICENSE) · [About the author](docs/ABOUT.md)
+**MIT** · The Conductor contributors  
+See [LICENSE](LICENSE) · [About](docs/ABOUT.md)
 
 <br/>
 

@@ -6,7 +6,9 @@ Security fixes land on the latest **1.18.x** line of The Conductor. Older tags a
 
 ## Reporting a vulnerability
 
-Please report security issues **privately** to the maintainer (repository owner / Vektra Industries contact on the project page). Do **not** open a public issue with exploit details until a fix or coordinated disclosure plan exists.
+Please report security issues **privately** via
+[GitHub Security Advisories](https://github.com/PabloTheThinker/the-conductor-hermes/security/advisories/new)
+for this repository. Do **not** open a public issue with exploit details until a fix or coordinated disclosure plan exists.
 
 Include:
 

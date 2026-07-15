@@ -327,7 +327,7 @@ def _sync_plugin_manifest(dest: Path) -> None:
             "description",
             "The Conductor — enhances Hermes (Soul Resonance, pillars, Remnants, spine).",
         )
-        man.setdefault("author", "Vektra Industries")
+        man.setdefault("author", "The Conductor")
         man.setdefault("kind", "standalone")
         man.setdefault("homepage", "https://github.com/PabloTheThinker/the-conductor-hermes")
         man["hooks"] = [

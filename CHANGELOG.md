@@ -4,14 +4,16 @@ Notable changes. Newest first.
 
 ---
 
-## [2026-07-15] — Professional author surface (docs)
+## [2026-07-15] — Product-first public face (docs)
 
-### Added
-- `docs/ABOUT.md` — project + author (Pablo Navarro / Vektra Industries), contact, principles.
-- README **Author** section and docs index link.
+### Changed
+- Removed personal name and business branding from README, LICENSE, SECURITY, plugin metadata, site footer, ethics/governance bylines.
+- `docs/ABOUT.md` is **product context** only (module purpose, contact, security) — not an author bio.
+- Attribution: **The Conductor contributors** (MIT), Hermes-style product framing.
 
 ### Notes
-- Docs-only; package version remains **1.18.11**.
+- Docs/metadata only; package version remains **1.18.11**.
+- Repository clone URLs still use the GitHub owner path (hosting identity, not marketing byline).
 
 ---
 

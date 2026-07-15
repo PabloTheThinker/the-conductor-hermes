@@ -1,7 +1,7 @@
 # Fable Framework — Five Laws & Operator Playbook (Conductor adaptation)
 
 **Version**: 1.0.0  
-**Status**: Operational specification (derived from Vektra Research)  
+**Status**: Operational specification (derived from internal research)  
 **Source**: internal Fable Five research note (2026-07-02 v2; adapted here)  
 **Purpose**: Encode how frontier agent systems actually achieve reliability — for Conductor behavior, skill design, and evidence-aligned gating.
 
@@ -86,7 +86,7 @@ Anti-patterns: kitchen-sink session, correcting over and over, trust-then-verify
 
 ## 7. Cross-connections
 
-| Vektra surface | Fable framework mapping |
+| Surface | Fable framework mapping |
 |----------------|-------------------------|
 | **Interegy** | Evidence-pack gate = vendor-classifier pattern; stochastic intelligence in deterministic scaffolding |
 | **The Conductor** | SOUL + skills + research = persona selection; memory discipline = filesystem continuity |

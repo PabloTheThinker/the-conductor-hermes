@@ -1,10 +1,10 @@
-# About
+# About The Conductor
 
-Professional context for **The Conductor** and its author — intended for operators, partners, and contributors evaluating the project.
+Product context for operators, partners, and contributors — **module-first**, no host-identity claim.
 
 ---
 
-## The project
+## What it is
 
 **The Conductor** is an open-source **skillset module** and **MCP server** for AI agent harnesses. It is designed to **enhance** a capable host agent — not replace the host’s identity, chat surface, or tool runtime.
 
@@ -26,53 +26,14 @@ Professional context for **The Conductor** and its author — intended for opera
 
 **Repository:** [github.com/PabloTheThinker/the-conductor-hermes](https://github.com/PabloTheThinker/the-conductor-hermes)
 
----
-
-## Author
-
-**Pablo Navarro**  
-Founder & CEO, **Vektra Industries**  
-GitHub: [@PabloTheThinker](https://github.com/PabloTheThinker)
-
-Pablo builds cognitive frameworks and autonomous-agent infrastructure for production use — orchestration, memory, multi-agent coordination, and safety systems that keep the **meister** in command.
-
-**Public presence**
-
-| | |
-|--|--|
-| GitHub | [github.com/PabloTheThinker](https://github.com/PabloTheThinker) |
-| Site | [pablothethinker.com](https://pablothethinker.com) |
-| X | [@pablothethinker](https://x.com/pablothethinker) |
-
-**Focus areas (high level)**
-
-- AI agent harnesses and skill modules  
-- Multi-agent orchestration and deliberation systems  
-- Software systems that pair cleanly with robotics and communications stacks  
-- Open tooling that respects host sovereignty and operator privacy  
-
-**Operating stance**
-
-> “See a path, secure a path.”
-
-Direct communication, architecture before build, evidence over theater. Privacy is non-negotiable for personal and operational data — this repository is the **public product surface**; private infrastructure stays private.
-
----
-
-## Vektra Industries
-
-**Vektra Industries** is Pablo’s company spanning AI, software, robotics, and communications. The Conductor is a Vektra open module: professional packaging, MIT license, no claim on the host agent’s soul or brand.
-
-Product byline convention for related publications:  
-*Written under Vektra Industries · Conductor by Pablo Navarro*
+Primary host reference: **[Hermes Agent](https://hermes-agent.nousresearch.com/)** by [Nous Research](https://nousresearch.com) — The Conductor is an independent module, not a Hermes fork and not affiliated with Nous Research.
 
 ---
 
 ## Contact & security
 
-- **General / product:** open a [GitHub Discussion or Issue](https://github.com/PabloTheThinker/the-conductor-hermes/issues) on this repository  
-- **Security:** see [SECURITY.md](../SECURITY.md) — report privately; do not file public exploit details  
-- **Commercial / partnership:** use contact channels listed on [pablothethinker.com](https://pablothethinker.com) or the GitHub profile  
+- **General / product:** open a [GitHub Issue](https://github.com/PabloTheThinker/the-conductor-hermes/issues) on this repository  
+- **Security:** see [SECURITY.md](../SECURITY.md) — report privately via [GitHub Security Advisories](https://github.com/PabloTheThinker/the-conductor-hermes/security/advisories/new); do not file public exploit details  
 
 ---
 
@@ -89,4 +50,4 @@ Product byline convention for related publications:
 
 ---
 
-*© 2026 Pablo Navarro / Vektra Industries · MIT*
+*MIT · The Conductor*
